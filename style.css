@@ -1059,7 +1059,9 @@ canvas {
 
 @media (max-width: 768px) {
     body {
-        overflow-y: auto;
+        overflow: auto !important;
+        height: auto !important;
+        width: auto !important;
     }
     
     .app-container {
@@ -1068,40 +1070,73 @@ canvas {
         flex-direction: column;
         height: auto;
         min-height: 100vh;
-        overflow-y: auto;
+        overflow: visible;
     }
     
     .sidebar {
         width: 100%;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
-        padding: 16px;
-        gap: 16px;
+        padding: 12px;
+        gap: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background-color: var(--bg-sidebar);
+    }
+
+    .sidebar-header {
+        margin-bottom: 4px;
+        text-align: center;
+        padding-left: 0;
     }
     
     .sidebar-nav {
+        display: flex;
         flex-direction: row;
+        background-color: rgba(0, 0, 0, 0.25);
+        border-radius: 8px;
+        padding: 4px;
+        gap: 4px;
         overflow-x: auto;
-        white-space: nowrap;
-        gap: 10px;
-        padding-bottom: 8px;
         width: 100%;
+        border: 1px solid var(--border-color);
         -webkit-overflow-scrolling: touch;
     }
     
     .nav-btn {
-        flex-shrink: 0;
-        padding: 10px 14px;
-        font-size: 13px;
+        flex: 1;
+        justify-content: center;
+        padding: 8px 10px;
+        font-size: 11px;
+        border-radius: 6px;
+        white-space: nowrap;
+        background-color: transparent;
+        color: var(--text-muted);
+        gap: 6px;
+    }
+
+    .nav-btn:hover {
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .nav-btn.active {
+        background-color: var(--accent);
+        color: #000;
+    }
+
+    .nav-btn .nav-icon {
+        width: 14px;
+        height: 14px;
     }
     
     .sidebar-footer {
         border-top: none;
         padding-top: 0;
         flex-direction: row;
-        flex-wrap: wrap;
         gap: 8px;
         width: 100%;
+        margin-top: 4px;
     }
     
     .sidebar-footer .section-label {
@@ -1111,18 +1146,22 @@ canvas {
     .sidebar-footer button {
         flex: 1;
         margin-top: 0 !important;
-        font-size: 12px;
-        padding: 8px 12px;
+        font-size: 11px;
+        padding: 8px;
+        border-radius: 6px !important;
         white-space: nowrap;
+        height: 34px;
     }
     
     .content-area {
-        padding: 20px;
+        padding: 16px;
         height: auto;
+        overflow: visible;
     }
     
     .pane-header h1, .pane-header-with-action h1 {
-        font-size: 24px;
+        font-size: 22px;
+        margin-bottom: 4px;
     }
     
     .layout-grid-selectors {
@@ -1132,15 +1171,15 @@ canvas {
     .interior-workspace {
         grid-template-columns: 1fr;
         height: auto;
-        gap: 20px;
+        gap: 16px;
     }
     
     .pages-list-container {
         border-right: none;
         border-bottom: 1px solid var(--border-color);
         padding-right: 0;
-        padding-bottom: 16px;
-        max-height: 180px;
+        padding-bottom: 12px;
+        max-height: 160px;
     }
     
     .pages-grid {
@@ -1153,14 +1192,17 @@ canvas {
     
     .page-thumb {
         flex-shrink: 0;
-        min-width: 120px;
-        padding: 8px 12px;
+        min-width: 110px;
+        padding: 6px 10px;
     }
     
     .preview-sidebar {
-        padding: 20px;
+        padding: 16px;
         min-height: auto;
         background-color: var(--bg-card);
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+        overflow: visible;
     }
     
     .modal-card {
