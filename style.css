@@ -1158,6 +1158,12 @@ canvas {
         height: auto;
         overflow: visible;
     }
+    .pane-header-with-action {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
     
     .pane-header h1, .pane-header-with-action h1 {
         font-size: 22px;
