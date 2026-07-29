@@ -1259,9 +1259,13 @@ function callImageGenerationAPI(prompt, callback) {
             };
 
             const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
-            console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt...`);
+            console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt (via CORS Proxy)...`);
             
-            fetch(`${comfyUrl}/api/prompt`, {
+            const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
+                ? `${comfyUrl}/api/prompt`
+                : `https://corsproxy.io/?${comfyUrl}/api/prompt`;
+
+            fetch(targetUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1357,7 +1361,11 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
             return;
         }
 
-        fetch(`${comfyUrl}/api/history/${promptId}`, {
+        const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
+            ? `${comfyUrl}/api/history/${promptId}`
+            : `https://corsproxy.io/?${comfyUrl}/api/history/${promptId}`;
+
+        fetch(targetUrl, {
             headers: {
                 "X-API-Key": apiKey
             }
@@ -1385,7 +1393,11 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
                 if (filename) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
-                    fetch(imageUrl, {
+                    const targetImageUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
+                        ? imageUrl
+                        : `https://corsproxy.io/?${imageUrl}`;
+
+                    fetch(targetImageUrl, {
                         headers: { "X-API-Key": apiKey }
                     })
                     .then(res => res.blob())
