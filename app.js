@@ -1136,36 +1136,21 @@ function initAPIConfig() {
         
         if (state.api.provider === "comfyui" && state.api.key) {
             const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
-            
-            function tryConnectionTest(attemptsLeft) {
-                const testUrl = getProxiedUrl(`${comfyUrl}/api/user`);
-                console.log(`Testando conexão do ComfyUI Cloud (Proxy índice ${currentProxyIndex}) em ${testUrl}...`);
-                
-                fetch(testUrl, {
-                    headers: { "X-API-Key": state.api.key }
-                })
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                })
-                .then(userData => {
-                    console.log("Conexão testada com sucesso! Usuário:", userData);
-                    alert(`Conexão com o ComfyUI Cloud testada com sucesso (via Proxy #${currentProxyIndex})!`);
-                })
-                .catch(err => {
-                    console.warn(`Erro no proxy #${currentProxyIndex}: ${err.message}`);
-                    if (attemptsLeft > 1) {
-                        console.log("Tentando alternar proxy...");
-                        rotateProxy();
-                        tryConnectionTest(attemptsLeft - 1);
-                    } else {
-                        console.error("Todos os proxies falharam no teste de conexão.");
-                        alert(`Aviso: O teste de conexão com o ComfyUI Cloud falhou em todos os proxies da lista (${err.message}). Verifique a chave ou a rede.`);
-                    }
-                });
-            }
-            
-            tryConnectionTest(PROXY_LIST.length);
+            fetchWithProxyFallback(`${comfyUrl}/api/user`, {
+                headers: { "X-API-Key": state.api.key }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(userData => {
+                console.log("Conexão testada com sucesso! Usuário:", userData);
+                alert("Conexão com o ComfyUI Cloud testada com sucesso!");
+            })
+            .catch(err => {
+                console.error("Todos os proxies falharam no teste de conexão.", err);
+                alert(`Aviso: O teste de conexão com o ComfyUI Cloud falhou em todas as rotas (${err.message}). Verifique a chave ou a rede.`);
+            });
         } else {
             if (state.api.key) {
                 alert("Chave de API salva com sucesso! O aplicativo está pronto para fazer chamadas de IA.");
@@ -1223,25 +1208,43 @@ document.getElementById("btn-build-bundle").addEventListener("click", () => {
     alert("Pronto! Pacote de Manuscrito e Metadados do KDP exportado com sucesso como JSON.");
 });
 
-// DYNAMIC CORS PROXY ROTATOR POOL (BYPASS BROWSER CORS BLOCKS FOR THIRD-PARTY APIs)
-const PROXY_LIST = [
-    url => url, // Chamada direta sem proxy (caso o ComfyUI Cloud libere CORS nativamente)
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url => `https://api.codetabs.com/v1/proxy?question=${encodeURIComponent(url)}`,
-    url => `https://thingproxy.freeboard.io/fetch/${url}`
-];
-let currentProxyIndex = 0;
-
-function getProxiedUrl(url) {
-    if (url.includes("localhost") || url.includes("127.0.0.1")) {
-        return url;
+// MULTI-FALLBACK FETCH FUNCTION FOR BYPASSING BROWSER CORS AND CLOUDFLARE BLOCKS
+function fetchWithProxyFallback(url, options) {
+    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+    if (isLocal) {
+        return fetch(url, options);
     }
-    return PROXY_LIST[currentProxyIndex](url);
-}
 
-function rotateProxy() {
-    currentProxyIndex = (currentProxyIndex + 1) % PROXY_LIST.length;
-    console.log(`Rotacionando proxy CORS. Novo índice de proxy ativo: ${currentProxyIndex}`);
+    // List of route dispatchers to try in sequence
+    const routes = [
+        url, // #0: Direct connection
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, // #1: AllOrigins
+        `https://api.codetabs.com/v1/proxy?question=${encodeURIComponent(url)}`, // #2: CodeTabs
+        `https://thingproxy.freeboard.io/fetch/${url}` // #3: ThingProxy (excellent header support)
+    ];
+
+    function tryRoute(index) {
+        if (index >= routes.length) {
+            return Promise.reject(new Error("Falha ao conectar via direct e proxies de contorno (CORS/Cloudflare block)."));
+        }
+
+        console.log(`Tentando rota de rede #${index} para ComfyUI...`);
+        return fetch(routes[index], options)
+            .then(res => {
+                // If it is a real application error (like 401 Unauthorized or 403 Forbidden from ComfyUI itself),
+                // we return it because the connection succeeded but the server rejected the key.
+                if (res.ok || res.status === 401 || res.status === 403 || res.status === 400) {
+                    return res;
+                }
+                throw new Error(`HTTP status ${res.status}`);
+            })
+            .catch(err => {
+                console.warn(`Rota #${index} falhou (${err.message}). Rotacionando para próxima rota...`);
+                return tryRoute(index + 1);
+            });
+    }
+
+    return tryRoute(0);
 }
 
 // HELPER TO UPDATE VISUAL GENERATION STATUS LIGHT
@@ -1336,9 +1339,7 @@ function callImageGenerationAPI(prompt, callback) {
             const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
             console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt (via CORS Proxy)...`);
             
-            const targetUrl = getProxiedUrl(`${comfyUrl}/api/prompt`);
-
-            fetch(targetUrl, {
+            fetchWithProxyFallback(`${comfyUrl}/api/prompt`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1444,9 +1445,8 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
         }
 
         setGenerationStatus("polling", `Processando (${attempts * 3}s)...`);
-        const targetUrl = getProxiedUrl(`${comfyUrl}/api/history/${promptId}`);
-
-        fetch(targetUrl, {
+        
+        fetchWithProxyFallback(`${comfyUrl}/api/history/${promptId}`, {
             headers: {
                 "X-API-Key": apiKey
             }
@@ -1474,9 +1474,8 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
                 if (filename) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
-                    const targetImageUrl = getProxiedUrl(imageUrl);
-
-                    fetch(targetImageUrl, {
+                    
+                    fetchWithProxyFallback(imageUrl, {
                         headers: { "X-API-Key": apiKey }
                     })
                     .then(res => res.blob())
