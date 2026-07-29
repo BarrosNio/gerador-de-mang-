@@ -50,7 +50,7 @@ let state = {
     activePageId: "page-1",
     activeTab: "print-setup",
     api: {
-        provider: "custom",
+        provider: "comfyui",
         key: "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25",
         chatKey: "",
         baseUrl: "",
@@ -106,8 +106,8 @@ function loadStateFromStorage() {
             }
 
             // Força a atualização para o novo provedor de teste ComfyUI se o cache estiver vazio ou com chaves antigas
-            if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "") {
-                state.api.provider = "custom";
+            if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "" || state.api.provider === "custom") {
+                state.api.provider = "comfyui";
                 state.api.key = "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25";
                 state.api.baseUrl = "";
                 state.api.model = "Illustrious XL";
@@ -1196,7 +1196,103 @@ function callImageGenerationAPI(prompt, callback) {
     const apiKey = state.api.key;
     
     if (apiKey && provider !== "mock") {
-        // Resolve base URL
+        // COMFYUI CLOUD API WORKFLOW INTEGRATION
+        if (provider === "comfyui") {
+            const promptWorkflow = {
+                "3": {
+                    "class_type": "KSampler",
+                    "inputs": {
+                        "seed": Math.floor(Math.random() * 100000000),
+                        "steps": 20,
+                        "cfg": 7,
+                        "sampler_name": "euler",
+                        "scheduler": "normal",
+                        "denoise": 1,
+                        "model": ["4", 0],
+                        "positive": ["6", 0],
+                        "negative": ["7", 0],
+                        "latent_image": ["5", 0]
+                    }
+                },
+                "4": {
+                    "class_type": "CheckpointLoaderSimple",
+                    "inputs": {
+                        "ckpt_name": state.api.model || "illustriousXL_v01.safetensors"
+                    }
+                },
+                "5": {
+                    "class_type": "EmptyLatentImage",
+                    "inputs": {
+                        "width": 1024,
+                        "height": 1024,
+                        "batch_size": 1
+                    }
+                },
+                "6": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": "masterpiece, best quality, manga style, " + prompt,
+                        "clip": ["4", 1]
+                    }
+                },
+                "7": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": "bad anatomy, blurry, worst quality, low quality",
+                        "clip": ["4", 1]
+                    }
+                },
+                "8": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["3", 0],
+                        "vae": ["4", 2]
+                    }
+                },
+                "9": {
+                    "class_type": "SaveImage",
+                    "inputs": {
+                        "filename_prefix": "MangaCreator",
+                        "images": ["8", 0]
+                    }
+                }
+            };
+
+            const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
+            console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt...`);
+            
+            fetch(`${comfyUrl}/api/prompt`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-API-Key": apiKey
+                },
+                body: JSON.stringify({
+                    prompt: promptWorkflow,
+                    extra_data: {
+                        api_key_comfy_org: apiKey
+                    }
+                })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`Falha no prompt ComfyUI: ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                const promptId = data.prompt_id;
+                if (!promptId) throw new Error("ID do prompt não retornado pelo ComfyUI.");
+                console.log(`Prompt enviado! ID: ${promptId}. Iniciando monitoramento...`);
+                pollComfyUIHistory(comfyUrl, promptId, apiKey, callback);
+            })
+            .catch(err => {
+                console.error("Erro no ComfyUI Cloud:", err);
+                alert(`Erro no ComfyUI Cloud: ${err.message}. Usando visual simulado.`);
+                generateMockImage(prompt, callback);
+            });
+            return;
+        }
+
+        // Resolve base URL for standard OpenAI / Proxies
         let baseUrl = "https://api.openai.com/v1";
         if (provider === "custom" && state.api.baseUrl) {
             baseUrl = state.api.baseUrl;
@@ -1247,6 +1343,73 @@ function callImageGenerationAPI(prompt, callback) {
     } else {
         generateMockImage(prompt, callback);
     }
+}
+
+// COMFYUI CLOUD POLLING FUNCTION
+function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
+    let attempts = 0;
+    const interval = setInterval(() => {
+        attempts++;
+        if (attempts > 30) { // Limita a 90 segundos
+            clearInterval(interval);
+            alert("A geração do ComfyUI excedeu o tempo limite de espera (90s).");
+            callback(null);
+            return;
+        }
+
+        fetch(`${comfyUrl}/api/history/${promptId}`, {
+            headers: {
+                "X-API-Key": apiKey
+            }
+        })
+        .then(res => {
+            if (res.status === 404) return null; // Ainda na fila ou processando
+            return res.json();
+        })
+        .then(data => {
+            if (data && data[promptId]) {
+                clearInterval(interval);
+                const historyData = data[promptId];
+                console.log("Geração concluída no ComfyUI!", historyData);
+                
+                let filename = "";
+                if (historyData.outputs) {
+                    for (const nodeId in historyData.outputs) {
+                        const nodeOutput = historyData.outputs[nodeId];
+                        if (nodeOutput.images && nodeOutput.images[0]) {
+                            filename = nodeOutput.images[0].filename;
+                            break;
+                        }
+                    }
+                }
+
+                if (filename) {
+                    const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
+                    fetch(imageUrl, {
+                        headers: { "X-API-Key": apiKey }
+                    })
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            callback(reader.result);
+                        };
+                        reader.readAsDataURL(blob);
+                    })
+                    .catch(err => {
+                        console.error("Erro ao baixar imagem do ComfyUI:", err);
+                        callback(null);
+                    });
+                } else {
+                    console.error("Nenhuma imagem encontrada na resposta do ComfyUI.");
+                    callback(null);
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Erro ao verificar histórico do ComfyUI:", err);
+        });
+    }, 3000);
 }
 
 function generateMockImage(prompt, callback) {
