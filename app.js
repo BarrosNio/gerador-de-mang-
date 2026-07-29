@@ -1134,11 +1134,44 @@ function initAPIConfig() {
         saveStateToStorage();
         modal.classList.remove("active");
         
-        // Update label or indicator
-        if (state.api.key) {
-            alert("Chave de API salva com sucesso! O aplicativo está pronto para fazer chamadas de IA.");
+        if (state.api.provider === "comfyui" && state.api.key) {
+            const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
+            
+            function tryConnectionTest(attemptsLeft) {
+                const testUrl = getProxiedUrl(`${comfyUrl}/api/user`);
+                console.log(`Testando conexão do ComfyUI Cloud (Proxy índice ${currentProxyIndex}) em ${testUrl}...`);
+                
+                fetch(testUrl, {
+                    headers: { "X-API-Key": state.api.key }
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(userData => {
+                    console.log("Conexão testada com sucesso! Usuário:", userData);
+                    alert(`Conexão com o ComfyUI Cloud testada com sucesso (via Proxy #${currentProxyIndex})!`);
+                })
+                .catch(err => {
+                    console.warn(`Erro no proxy #${currentProxyIndex}: ${err.message}`);
+                    if (attemptsLeft > 1) {
+                        console.log("Tentando alternar proxy...");
+                        rotateProxy();
+                        tryConnectionTest(attemptsLeft - 1);
+                    } else {
+                        console.error("Todos os proxies falharam no teste de conexão.");
+                        alert(`Aviso: O teste de conexão com o ComfyUI Cloud falhou em todos os proxies da lista (${err.message}). Verifique a chave ou a rede.`);
+                    }
+                });
+            }
+            
+            tryConnectionTest(PROXY_LIST.length);
         } else {
-            alert("Configurações atualizadas para o modo Simulado.");
+            if (state.api.key) {
+                alert("Chave de API salva com sucesso! O aplicativo está pronto para fazer chamadas de IA.");
+            } else {
+                alert("Configurações atualizadas para o modo Simulado.");
+            }
         }
     });
 
@@ -1189,6 +1222,27 @@ document.getElementById("btn-build-bundle").addEventListener("click", () => {
 
     alert("Pronto! Pacote de Manuscrito e Metadados do KDP exportado com sucesso como JSON.");
 });
+
+// DYNAMIC CORS PROXY ROTATOR POOL (BYPASS BROWSER CORS BLOCKS FOR THIRD-PARTY APIs)
+const PROXY_LIST = [
+    url => url, // Chamada direta sem proxy (caso o ComfyUI Cloud libere CORS nativamente)
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?question=${encodeURIComponent(url)}`,
+    url => `https://thingproxy.freeboard.io/fetch/${url}`
+];
+let currentProxyIndex = 0;
+
+function getProxiedUrl(url) {
+    if (url.includes("localhost") || url.includes("127.0.0.1")) {
+        return url;
+    }
+    return PROXY_LIST[currentProxyIndex](url);
+}
+
+function rotateProxy() {
+    currentProxyIndex = (currentProxyIndex + 1) % PROXY_LIST.length;
+    console.log(`Rotacionando proxy CORS. Novo índice de proxy ativo: ${currentProxyIndex}`);
+}
 
 // DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
 function callImageGenerationAPI(prompt, callback) {
@@ -1261,9 +1315,7 @@ function callImageGenerationAPI(prompt, callback) {
             const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
             console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt (via CORS Proxy)...`);
             
-            const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
-                ? `${comfyUrl}/api/prompt`
-                : `https://corsproxy.io/?${encodeURIComponent(comfyUrl + "/api/prompt")}`;
+            const targetUrl = getProxiedUrl(`${comfyUrl}/api/prompt`);
 
             fetch(targetUrl, {
                 method: "POST",
@@ -1279,7 +1331,7 @@ function callImageGenerationAPI(prompt, callback) {
                 })
             })
             .then(res => {
-                if (!res.ok) throw new Error(`Falha no prompt ComfyUI: ${res.status}`);
+                if (!res.ok) throw new Error(`Falha no prompt ComfyUI: Servidor retornou código ${res.status} (${res.statusText})`);
                 return res.json();
             })
             .then(data => {
@@ -1289,8 +1341,8 @@ function callImageGenerationAPI(prompt, callback) {
                 pollComfyUIHistory(comfyUrl, promptId, apiKey, callback);
             })
             .catch(err => {
-                console.error("Erro no ComfyUI Cloud:", err);
-                alert(`Erro no ComfyUI Cloud: ${err.message}. Usando visual simulado.`);
+                console.error("Erro detalhado ComfyUI Cloud:", err);
+                alert(`Erro no ComfyUI Cloud: ${err.name} - ${err.message}. Verifique o console para mais detalhes. Usando visual simulado.`);
                 generateMockImage(prompt, callback);
             });
             return;
@@ -1361,9 +1413,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
             return;
         }
 
-        const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
-            ? `${comfyUrl}/api/history/${promptId}`
-            : `https://corsproxy.io/?${encodeURIComponent(comfyUrl + "/api/history/" + promptId)}`;
+        const targetUrl = getProxiedUrl(`${comfyUrl}/api/history/${promptId}`);
 
         fetch(targetUrl, {
             headers: {
@@ -1393,9 +1443,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
                 if (filename) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
-                    const targetImageUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
-                        ? imageUrl
-                        : `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
+                    const targetImageUrl = getProxiedUrl(imageUrl);
 
                     fetch(targetImageUrl, {
                         headers: { "X-API-Key": apiKey }
