@@ -1244,12 +1244,33 @@ function rotateProxy() {
     console.log(`Rotacionando proxy CORS. Novo índice de proxy ativo: ${currentProxyIndex}`);
 }
 
+// HELPER TO UPDATE VISUAL GENERATION STATUS LIGHT
+function setGenerationStatus(status, label) {
+    const dot = document.getElementById("api-status-dot");
+    const text = document.getElementById("api-status-text");
+    if (!dot || !text) return;
+    
+    dot.className = "status-dot";
+    
+    if (status === "idle") {
+        dot.classList.add("green");
+        text.innerText = label || "Pronto";
+    } else if (status === "creating") {
+        dot.classList.add("red");
+        text.innerText = label || "Conectando...";
+    } else if (status === "polling") {
+        dot.classList.add("yellow");
+        text.innerText = label || "Criando...";
+    }
+}
+
 // DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
 function callImageGenerationAPI(prompt, callback) {
     const provider = state.api.provider || "mock";
     const apiKey = state.api.key;
     
     if (apiKey && provider !== "mock") {
+        setGenerationStatus("creating", "Gerando arte...");
         // COMFYUI CLOUD API WORKFLOW INTEGRATION
         if (provider === "comfyui") {
             const promptWorkflow = {
@@ -1341,9 +1362,11 @@ function callImageGenerationAPI(prompt, callback) {
                 pollComfyUIHistory(comfyUrl, promptId, apiKey, callback);
             })
             .catch(err => {
+                setGenerationStatus("idle", "Erro");
                 console.error("Erro detalhado ComfyUI Cloud:", err);
                 alert(`Erro no ComfyUI Cloud: ${err.name} - ${err.message}. Verifique o console para mais detalhes. Usando visual simulado.`);
                 generateMockImage(prompt, callback);
+                setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
             });
             return;
         }
@@ -1386,15 +1409,19 @@ function callImageGenerationAPI(prompt, callback) {
                 if (!base64.startsWith("data:image")) {
                     base64 = "data:image/png;base64," + base64;
                 }
+                setGenerationStatus("idle", "Finalizado!");
                 callback(base64);
+                setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
             } else {
                 throw new Error("Formato de resposta inválido da API.");
             }
         })
         .catch(err => {
+            setGenerationStatus("idle", "Erro");
             console.error(`Erro na geração de imagem (${provider}):`, err);
             alert(`Falha na IA (${provider}): ${err.message}. Usando visual de rascunho de contingência.`);
             generateMockImage(prompt, callback);
+            setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
         });
     } else {
         generateMockImage(prompt, callback);
@@ -1404,15 +1431,19 @@ function callImageGenerationAPI(prompt, callback) {
 // COMFYUI CLOUD POLLING FUNCTION
 function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
     let attempts = 0;
+    setGenerationStatus("polling", "Fila ComfyUI...");
     const interval = setInterval(() => {
         attempts++;
-        if (attempts > 30) { // Limita a 90 segundos
+        if (attempts > 100) { // Limita a 5 minutos (300 segundos)
             clearInterval(interval);
-            alert("A geração do ComfyUI excedeu o tempo limite de espera (90s).");
+            setGenerationStatus("idle", "Excedido");
+            alert("A geração do ComfyUI excedeu o tempo limite de espera de 5 minutos (300s). A máquina pode estar carregando o modelo.");
             callback(null);
+            setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
             return;
         }
 
+        setGenerationStatus("polling", `Processando (${attempts * 3}s)...`);
         const targetUrl = getProxiedUrl(`${comfyUrl}/api/history/${promptId}`);
 
         fetch(targetUrl, {
@@ -1452,17 +1483,23 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
                     .then(blob => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
+                            setGenerationStatus("idle", "Finalizado!");
                             callback(reader.result);
+                            setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
                         };
                         reader.readAsDataURL(blob);
                     })
                     .catch(err => {
+                        setGenerationStatus("idle", "Erro");
                         console.error("Erro ao baixar imagem do ComfyUI:", err);
                         callback(null);
+                        setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
                     });
                 } else {
+                    setGenerationStatus("idle", "Erro");
                     console.error("Nenhuma imagem encontrada na resposta do ComfyUI.");
                     callback(null);
+                    setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
                 }
             }
         })
