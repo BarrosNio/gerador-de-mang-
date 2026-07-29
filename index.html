@@ -194,6 +194,43 @@
                             <span>Atualizar Lista da Nuvem</span>
                         </button>
                     </div>
+
+                    <!-- Card de Simulação de Gastos da API -->
+                    <div class="calculation-card">
+                        <div class="calc-header">
+                            <div class="calc-icon-box">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            <div class="calc-title-box">
+                                <h3>Consumo e Gastos da API (GPT)</h3>
+                                <p>Monitore os créditos consumidos no chat com base no saldo de $5.00 dólares da OpenAI.</p>
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">Tokens Consumidos:</span>
+                                <span style="font-weight: 600;" id="stats-total-tokens">0 tkn</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">Custo Acumulado:</span>
+                                <span style="font-weight: 600; color: #10b981;" id="stats-total-cost">$0.0000 USD</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">Saldo Restante (OpenAI):</span>
+                                <span style="font-weight: 600; color: var(--accent);" id="stats-remaining-balance">$5.0000 USD</span>
+                            </div>
+                            <!-- Barra de progresso visual -->
+                            <div style="width: 100%; height: 8px; background-color: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-top: 6px;">
+                                <div id="stats-cost-bar" style="width: 0%; height: 100%; background-color: var(--accent); transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                        <button class="action-btn-secondary" id="btn-reset-api-costs" style="width: 100%; border-radius: 8px; font-size: 11px; margin-top: 12px; height: 32px; padding: 0;">
+                            <span>Zerar Contador de Gastos</span>
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -448,22 +485,33 @@
                     <label for="api-provider">Provedor de IA</label>
                     <div class="select-wrapper">
                         <select id="api-provider">
-                            <option value="omniroute" selected>OmniRoute AI Gateway (https://omniroute.online)</option>
+                            <option value="openai">OpenAI (DALL-E 3 / Compatíveis)</option>
+                            <option value="omniroute">OmniRoute AI Gateway (https://omniroute.online)</option>
                             <option value="gemini">Google Gemini API (Recomendado)</option>
-                            <option value="openai">OpenAI (DALL-E 3)</option>
-                            <option value="mock">Gerador Interno Simulado (Grátis)</option>
+                            <option value="custom">Custom Endpoint (ComfyUI / Outros)</option>
+                            <option value="mock" selected>Gerador Interno Simulado (Grátis)</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="api-key-input">API Key</label>
-                    <input type="password" id="api-key-input" placeholder="Cole sua chave de API aqui...">
+                    <label for="api-key-input">API Key (Gerador de Imagem)</label>
+                    <input type="password" id="api-key-input" placeholder="Cole sua chave de API de imagem aqui...">
+                </div>
+
+                <div class="form-group">
+                    <label for="api-chat-key-input">OpenAI API Key (Para o Chat/Orientador)</label>
+                    <input type="password" id="api-chat-key-input" placeholder="Cole sua chave sk-proj-... do chat aqui...">
+                </div>
+
+                <div class="form-group">
+                    <label for="api-base-url">Base URL (Opcional - ex: ComfyUI / Proxy)</label>
+                    <input type="text" id="api-base-url" placeholder="Deixe em branco para o padrão do provedor...">
                 </div>
 
                 <div class="form-group">
                     <label for="api-model">Modelo de Imagem</label>
-                    <input type="text" id="api-model" value="imagen-3.0-generate-002" placeholder="Ex: imagen-3.0-generate-002 ou dall-e-3">
+                    <input type="text" id="api-model" value="Illustrious XL" placeholder="Ex: Illustrious XL ou dall-e-3">
                 </div>
 
                 <div class="status-indicator" id="api-status-msg">

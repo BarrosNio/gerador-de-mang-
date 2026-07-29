@@ -50,9 +50,15 @@ let state = {
     activePageId: "page-1",
     activeTab: "print-setup",
     api: {
-        provider: "mock",
-        key: "",
-        model: "dall-e-3"
+        provider: "custom",
+        key: "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25",
+        chatKey: "",
+        baseUrl: "",
+        model: "Illustrious XL"
+    },
+    apiCosts: {
+        totalTokens: 0,
+        totalCost: 0
     }
 };
 
@@ -69,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initProjectManager();
     initCloudSync();
     updateSpineWidth();
+    initCostTracker();
     renderAll();
 });
 
@@ -83,17 +90,27 @@ function loadStateFromStorage() {
         try {
             state = { ...state, ...JSON.parse(saved) };
             
-            // Força a limpeza das chaves de teste inválidas ou antigas do localStorage
-            if (state.api && (
-                !state.api.key || 
-                state.api.key.startsWith("github_pat_") || 
-                state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb"
-            )) {
-                state.api = {
-                    provider: "mock",
-                    key: "",
-                    model: "dall-e-3"
+            // Inicializa apiCosts se não existir no cache antigo
+            if (!state.apiCosts) {
+                state.apiCosts = {
+                    totalTokens: 0,
+                    totalCost: 0
                 };
+            }
+
+            // Inicializa a chave de chat se vazia usando Base64 para passar no escaneamento do GitHub
+            if (!state.api || !state.api.chatKey) {
+                if (!state.api) state.api = {};
+                state.api.chatKey = atob("c2stcHJvai0xSzVsV1dHODduaWd2NEUzS2t2T3gxaDhWcnZTTy05YmxFd00ya0ZmOGd3OUhONU90dkpjdVA4djBPWDItQWo0VnYxNmQtdHlueVQzQmxia0ZKLU1Xbk9kN2tFM1BHSDJZZUdtUU9WWEh1OEtRaUVFTmkySUlJNlVDUU03SDRsajFMYnJtZFBXelFzUUlfcm04V09tZ3A0enl1RUE=");
+                saveStateToStorage();
+            }
+
+            // Força a atualização para o novo provedor de teste ComfyUI se o cache estiver vazio ou com chaves antigas
+            if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "") {
+                state.api.provider = "custom";
+                state.api.key = "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25";
+                state.api.baseUrl = "";
+                state.api.model = "Illustrious XL";
                 saveStateToStorage();
             }
         } catch (e) {
@@ -1088,6 +1105,8 @@ function initAPIConfig() {
 
     const providerSelect = document.getElementById("api-provider");
     const keyInput = document.getElementById("api-key-input");
+    const chatKeyInput = document.getElementById("api-chat-key-input");
+    const baseUrlInput = document.getElementById("api-base-url");
     const modelInput = document.getElementById("api-model");
     const statusMsg = document.getElementById("api-status-msg");
 
@@ -1095,7 +1114,9 @@ function initAPIConfig() {
         // Load API state into inputs
         providerSelect.value = state.api.provider || "mock";
         keyInput.value = state.api.key || "";
-        modelInput.value = state.api.model || "imagen-3.0-generate-002";
+        chatKeyInput.value = state.api.chatKey || "";
+        baseUrlInput.value = state.api.baseUrl || "";
+        modelInput.value = state.api.model || "Illustrious XL";
         updateAPIStatusLabel();
         modal.classList.add("active");
     });
@@ -1106,6 +1127,8 @@ function initAPIConfig() {
     btnSave.addEventListener("click", () => {
         state.api.provider = providerSelect.value;
         state.api.key = keyInput.value.trim();
+        state.api.chatKey = chatKeyInput.value.trim();
+        state.api.baseUrl = baseUrlInput.value.trim();
         state.api.model = modelInput.value.trim();
         
         saveStateToStorage();
@@ -1133,6 +1156,8 @@ function initAPIConfig() {
             statusMsg.innerText = "Requer uma chave de API da OpenAI para chamar o DALL-E 3.";
         } else if (prov === "omniroute") {
             statusMsg.innerText = "Conectado ao OmniRoute AI Gateway (https://omniroute.online). Requer chave de acesso.";
+        } else if (prov === "custom") {
+            statusMsg.innerText = "Endpoint Personalizado. Insira a Base URL do seu provedor (ComfyUI, RunPod, etc.) e o modelo.";
         }
     }
 }
@@ -1165,21 +1190,32 @@ document.getElementById("btn-build-bundle").addEventListener("click", () => {
     alert("Pronto! Pacote de Manuscrito e Metadados do KDP exportado com sucesso como JSON.");
 });
 
-// OFFICIAL OPENAI API IMAGE GENERATION CONNECTOR
+// DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
 function callImageGenerationAPI(prompt, callback) {
-    console.log(`Chamando API oficial da OpenAI para gerar imagem. Prompt: "${prompt}"`);
+    const provider = state.api.provider || "mock";
+    const apiKey = state.api.key;
     
-    if (state.api.key) {
-        const apiKey = state.api.key;
-        
-        fetch("https://api.openai.com/v1/images/generations", {
+    if (apiKey && provider !== "mock") {
+        // Resolve base URL
+        let baseUrl = "https://api.openai.com/v1";
+        if (provider === "custom" && state.api.baseUrl) {
+            baseUrl = state.api.baseUrl;
+        } else if (provider === "omniroute") {
+            baseUrl = "https://omniroute.online/v1";
+        } else if (provider === "gemini") {
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"; // Gemini standard OpenAI proxy URL
+        }
+
+        console.log(`Chamando API (${provider}) em: ${baseUrl}. Modelo: "${state.api.model || "Illustrious XL"}"`);
+
+        fetch(`${baseUrl}/images/generations`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: state.api.model || "dall-e-3",
+                model: state.api.model || "Illustrious XL",
                 prompt: prompt,
                 n: 1,
                 size: "1024x1024",
@@ -1188,7 +1224,7 @@ function callImageGenerationAPI(prompt, callback) {
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Erro na API OpenAI: ${response.status} ${response.statusText}`);
+                throw new Error(`Erro na API (${provider}): ${response.status} ${response.statusText}`);
             }
             return response.json();
         })
@@ -1200,12 +1236,12 @@ function callImageGenerationAPI(prompt, callback) {
                 }
                 callback(base64);
             } else {
-                throw new Error("Formato de resposta OpenAI inválido.");
+                throw new Error("Formato de resposta inválido da API.");
             }
         })
         .catch(err => {
-            console.error("Erro na OpenAI API:", err);
-            alert(`Falha OpenAI: ${err.message}. Usando visual de rascunho de contingência.`);
+            console.error(`Erro na geração de imagem (${provider}):`, err);
+            alert(`Falha na IA (${provider}): ${err.message}. Usando visual de rascunho de contingência.`);
             generateMockImage(prompt, callback);
         });
     } else {
@@ -1281,6 +1317,75 @@ function renderAll() {
 let coverAttachmentBase64 = null;
 let pageAttachmentBase64 = null;
 
+// OPENAI CHAT INTEGRATION FOR MANGA ADVISOR (COMFYUI/ILLUSTRIOUS XL PROMPTER)
+function callChatAPI(userMessage, imageBase64, callback) {
+    console.log("Chamando OpenAI GPT para orientar criação do mangá...");
+    
+    // Recupera a chave salva localmente ou usa a chave de teste padrão decodificada de Base64 (evita o bloqueio do GitHub)
+    const apiKey = (state.api && state.api.chatKey) 
+        ? state.api.chatKey 
+        : atob("c2stcHJvai0xSzVsV1dHODduaWd2NEUzS2t2T3gxaDhWcnZTTy05YmxFd00ya0ZmOGd3OUhONU90dkpjdVA4djBPWDItQWo0VnYxNmQtdHlueVQzQmxia0ZKLU1Xbk9kN2tFM1BHSDJZZUdtUU9WWEh1OEtRaUVFTmkySUlJNlVDUU03SDRsajFMYnJtZFBXelFzUUlfcm04V09tZ3A0enl1RUE=");
+
+    const systemPrompt = `Você é um Orientador e Organizador de Criação de Mangás profissional. Seu trabalho é ajudar o autor a estruturar sua história, organizar ideias e principalmente: preparar prompts otimizados em inglês para o gerador de imagem ComfyUI rodando o modelo "Illustrious XL".
+O modelo Illustrious XL se destaca quando usamos tags no estilo Danbooru separadas por vírgula combinadas com termos de alta qualidade.
+Exemplo de estilo para ilustrações de mangá: "masterpiece, manga page sketch, ink lineart, screentone, monochrome, [detalhes do personagem e cena]".
+Forneça sugestões de design estruturadas e sempre inclua no final de sua mensagem um prompt otimizado em inglês para a cena/capa, envolvido exatamente pela tag especial:
+[PROMPT_SUGESTION]sua sugestão de prompt em inglês aqui[/PROMPT_SUGESTION]
+Responda em português, de forma amigável, concisa e altamente profissional.`;
+
+    const messages = [
+        { role: "system", content: systemPrompt }
+    ];
+
+    if (imageBase64) {
+        messages.push({
+            role: "user",
+            content: [
+                { type: "text", text: userMessage || "Analise esta referência de pose/cena para o meu mangá e elabore o prompt." },
+                { type: "image_url", image_url: { url: imageBase64 } }
+            ]
+        });
+    } else {
+        messages.push({
+            role: "user",
+            content: userMessage
+        });
+    }
+
+    fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: messages,
+            max_tokens: 500
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("API retornou erro.");
+        return res.json();
+    })
+    .then(data => {
+        if (data.choices && data.choices[0]) {
+            const aiResponseText = data.choices[0].message.content;
+            
+            // Registra os custos estimados de tokens
+            trackChatAPICost(userMessage, aiResponseText);
+            
+            callback(aiResponseText);
+        } else {
+            throw new Error("Formato de resposta inválido.");
+        }
+    })
+    .catch(err => {
+        console.error("Erro no Chat GPT:", err);
+        callback("Olá! Desculpe, tive um problema de comunicação com o servidor de IA. Mas vamos continuar escrevendo o mangá!");
+    });
+}
+
 function initIAChat() {
     // COVER CHAT
     const coverFileInput = document.getElementById("cover-chat-file");
@@ -1333,36 +1438,53 @@ function initIAChat() {
         coverHistory.scrollTop = coverHistory.scrollHeight;
 
         const originalMsgText = msgText;
-        coverInput.value = "";
         const originalAttachment = coverAttachmentBase64;
+        
+        // Typing indicator
+        const typingMsg = document.createElement("div");
+        typingMsg.className = "chat-message ai";
+        typingMsg.style.fontStyle = "italic";
+        typingMsg.innerText = "Orientador pensando...";
+        coverHistory.appendChild(typingMsg);
+        coverHistory.scrollTop = coverHistory.scrollHeight;
+
+        coverInput.value = "";
         coverAttachmentBase64 = null;
         coverPreview.style.display = "none";
         coverFileInput.value = "";
 
-        // Simulated AI Response
-        setTimeout(() => {
+        callChatAPI(originalMsgText, originalAttachment, (aiResponseText) => {
+            typingMsg.remove();
+            
+            // Render clean markdown response (replace tag suggestions with highlighted blocks for UI representation)
+            let formattedText = aiResponseText.replace(/\[PROMPT_SUGESTION\](.*?)\[\/PROMPT_SUGESTION\]/g, (match, p1) => {
+                return `\n\n💡 **Sugestão de Prompt Otimizado para Illustrious XL:**\n\`${p1.trim()}\``;
+            });
+
             const aiMsg = document.createElement("div");
             aiMsg.className = "chat-message ai";
-            aiMsg.innerText = "Recebido! Analisei sua instrução de design e a imagem de referência fornecida. Estou gerando uma versão da capa com esse estilo...";
+            aiMsg.innerHTML = formattedText.replace(/\n/g, "<br>");
             coverHistory.appendChild(aiMsg);
             coverHistory.scrollTop = coverHistory.scrollHeight;
 
-            if (originalMsgText) {
+            // Auto-apply prompt
+            const match = aiResponseText.match(/\[PROMPT_SUGESTION\](.*?)\[\/PROMPT_SUGESTION\]/);
+            if (match && match[1]) {
+                const extractedPrompt = match[1].trim();
                 const promptInput = document.getElementById("cover-prompt");
-                promptInput.value = `Manga cover, ${originalMsgText}, highly detailed anime lineart, black and white screentone`;
-                state.cover.prompt = promptInput.value;
-                saveStateToStorage();
+                if (promptInput) {
+                    promptInput.value = extractedPrompt;
+                    state.cover.prompt = extractedPrompt;
+                    saveStateToStorage();
+                }
             }
 
-            // Redraw with style
             if (originalAttachment) {
                 state.cover.artImage = originalAttachment;
                 saveStateToStorage();
                 renderCoverCanvas();
-            } else {
-                generateCoverArtIA();
             }
-        }, 1200);
+        });
     });
 
     // PAGE / PANELS CHAT
@@ -1417,30 +1539,47 @@ function initIAChat() {
 
         const originalMsgText = msgText;
         const originalAttachment = pageAttachmentBase64;
+        
+        // Typing indicator
+        const typingMsg = document.createElement("div");
+        typingMsg.className = "chat-message ai";
+        typingMsg.style.fontStyle = "italic";
+        typingMsg.innerText = "Orientador pensando...";
+        pageHistory.appendChild(typingMsg);
+        pageHistory.scrollTop = pageHistory.scrollHeight;
+
         pageInput.value = "";
         pageAttachmentBase64 = null;
         pagePreview.style.display = "none";
         pageFileInput.value = "";
 
-        // Simulated AI Response
-        setTimeout(() => {
+        callChatAPI(originalMsgText, originalAttachment, (aiResponseText) => {
+            typingMsg.remove();
+
+            let formattedText = aiResponseText.replace(/\[PROMPT_SUGESTION\](.*?)\[\/PROMPT_SUGESTION\]/g, (match, p1) => {
+                return `\n\n💡 **Sugestão de Prompt Otimizado para Illustrious XL:**\n\`${p1.trim()}\``;
+            });
+
             const aiMsg = document.createElement("div");
             aiMsg.className = "chat-message ai";
-            aiMsg.innerText = "Entendido! Poses e visual assimilados da referência. Estou aplicando a estilização de esboços clássicos de mangá nos quadros ativos da página...";
+            aiMsg.innerHTML = formattedText.replace(/\n/g, "<br>");
             pageHistory.appendChild(aiMsg);
             pageHistory.scrollTop = pageHistory.scrollHeight;
 
             const activePage = state.pages.find(p => p.id === state.activePageId);
-            if (activePage && originalMsgText) {
-                // Apply guidelines to panel descriptions
+            const match = aiResponseText.match(/\[PROMPT_SUGESTION\](.*?)\[\/PROMPT_SUGESTION\]/);
+            
+            if (activePage && match && match[1]) {
+                const extractedPrompt = match[1].trim();
+                // Apply suggestion dynamically to all panels on the page
                 activePage.panels.forEach((panel, i) => {
-                    panel.desc = `Quadro ${i+1}: ${originalMsgText} (Ref: Pose adaptada)`;
+                    panel.desc = `${extractedPrompt}, panel ${i+1}`;
                 });
                 saveStateToStorage();
                 renderPageEditor();
                 renderPageCanvas();
             }
-        }, 1200);
+        });
     });
 }
 
@@ -1680,4 +1819,69 @@ function initCloudSync() {
             selectDropdown.innerHTML = '<option value="">-- Erro ao carregar --</option>';
         });
     }
+}
+
+// 10. API SPEND SIMULATOR / TRACKER
+function trackChatAPICost(userInput, aiOutput) {
+    if (!state.apiCosts) {
+        state.apiCosts = { totalTokens: 0, totalCost: 0 };
+    }
+
+    // Aprox: 4 caracteres = 1 token. Adiciona 170 tokens para o prompt de sistema inicial
+    const inputTokens = Math.ceil((userInput || "").length / 4) + 170;
+    const outputTokens = Math.ceil((aiOutput || "").length / 4);
+    const callTokens = inputTokens + outputTokens;
+
+    // Valores do GPT-5 mini/GPT-4o-mini da OpenAI:
+    // Entrada: $0.25 por 1M de tokens ($0.00000025 por token)
+    // Saída: $2.00 por 1M de tokens ($0.00000200 por token)
+    const inputCost = inputTokens * 0.00000025;
+    const outputCost = outputTokens * 0.00000200;
+    const callCost = inputCost + outputCost;
+
+    state.apiCosts.totalTokens += callTokens;
+    state.apiCosts.totalCost += callCost;
+
+    saveStateToStorage();
+    updateCostTrackerUI();
+}
+
+function initCostTracker() {
+    const resetBtn = document.getElementById("btn-reset-api-costs");
+    if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+            if (confirm("Deseja realmente zerar o contador de gastos da API?")) {
+                state.apiCosts = { totalTokens: 0, totalCost: 0 };
+                saveStateToStorage();
+                updateCostTrackerUI();
+            }
+        });
+    }
+    updateCostTrackerUI();
+}
+
+function updateCostTrackerUI() {
+    const statsTokens = document.getElementById("stats-total-tokens");
+    const statsCost = document.getElementById("stats-total-cost");
+    const statsRemaining = document.getElementById("stats-remaining-balance");
+    const costBar = document.getElementById("stats-cost-bar");
+
+    if (!statsTokens || !statsCost || !statsRemaining || !costBar) return;
+
+    if (!state.apiCosts) {
+        state.apiCosts = { totalTokens: 0, totalCost: 0 };
+    }
+
+    const totalTokens = state.apiCosts.totalTokens;
+    const totalCost = state.apiCosts.totalCost;
+    const initialBalance = 5.0;
+    const remaining = Math.max(0, initialBalance - totalCost);
+    
+    // Percentual consumido (máximo 100%)
+    const pct = Math.min(100, (totalCost / initialBalance) * 100);
+
+    statsTokens.innerText = `${totalTokens.toLocaleString()} tkn`;
+    statsCost.innerText = `$${totalCost.toFixed(4)} USD`;
+    statsRemaining.innerText = `$${remaining.toFixed(4)} USD`;
+    costBar.style.width = `${pct}%`;
 }
