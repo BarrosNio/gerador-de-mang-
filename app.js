@@ -1263,7 +1263,7 @@ function callImageGenerationAPI(prompt, callback) {
             
             const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
                 ? `${comfyUrl}/api/prompt`
-                : `https://corsproxy.io/?${comfyUrl}/api/prompt`;
+                : `https://corsproxy.io/?${encodeURIComponent(comfyUrl + "/api/prompt")}`;
 
             fetch(targetUrl, {
                 method: "POST",
@@ -1363,7 +1363,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
         const targetUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
             ? `${comfyUrl}/api/history/${promptId}`
-            : `https://corsproxy.io/?${comfyUrl}/api/history/${promptId}`;
+            : `https://corsproxy.io/?${encodeURIComponent(comfyUrl + "/api/history/" + promptId)}`;
 
         fetch(targetUrl, {
             headers: {
@@ -1395,7 +1395,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
                     const targetImageUrl = comfyUrl.includes("localhost") || comfyUrl.includes("127.0.0.1")
                         ? imageUrl
-                        : `https://corsproxy.io/?${imageUrl}`;
+                        : `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
 
                     fetch(targetImageUrl, {
                         headers: { "X-API-Key": apiKey }
