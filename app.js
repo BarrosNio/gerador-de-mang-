@@ -1215,11 +1215,11 @@ function fetchWithProxyFallback(url, options) {
         return fetch(url, options);
     }
 
-    // List of route dispatchers to try in sequence (with URL-encoding to preserve target query parameters like &type=output)
+    // List of route dispatchers to try in sequence (NO url-encoding for corsproxy.io)
     const routes = [
         url, // #0: Direct connection (if local CORS extension is active and configured)
-        `https://corsproxy.io/?${encodeURIComponent(url)}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
-        `https://cors.lol/?${encodeURIComponent(url)}` // #2: CORS.lol (open-source proxy, supports POST and headers)
+        `https://corsproxy.io/?${url}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
+        `https://cors.lol/?${url}` // #2: CORS.lol (open-source proxy, supports POST and headers)
     ];
 
     function tryRoute(index) {
