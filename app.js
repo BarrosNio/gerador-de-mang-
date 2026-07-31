@@ -343,7 +343,7 @@ function renderCharactersList() {
 
         card.querySelector(".btn-generate-char-art").addEventListener("click", () => {
             alert(`Gerando visual para o personagem ${char.name}...`);
-            const pmt = char.prompt || `Manga style closeup face sketch of character ${char.name}, ${char.desc}`;
+            const pmt = char.prompt || `Solo Leveling manhwa style, sharp details, closeup face of character ${char.name}, ${char.desc}, dark fantasy anime style, glowing magical aura`;
             callImageGenerationAPI(pmt, (base64) => {
                 char.avatarImage = base64;
                 saveStateToStorage();
@@ -1282,7 +1282,7 @@ function translatePromptToEnglish(text, callback) {
         return;
     }
     
-    const sysPrompt = "You are an expert manga illustrator and prompt engineer. Translate the user's Portuguese description or character visual prompt into a highly detailed, descriptive English prompt optimized for Stable Diffusion XL (Illustrious XL). Include relevant tags and style keywords such as: anime, manga sketch, masterpiece, rating_safe, source_anime, monochrome, lineart if appropriate. Output ONLY the final English prompt. Do not write any explanations or metadata.";
+    const sysPrompt = "You are an expert manga and manhwa illustrator. Translate the user's Portuguese description or character prompt into a highly detailed, descriptive English prompt optimized for Stable Diffusion XL (Illustrious XL). Include style keywords to achieve a modern manhwa/Solo Leveling look: Solo Leveling style, dark fantasy anime, glowing blue magical energy, electric sparks, sharp cel shading, masterpiece, best quality, rating_safe, source_anime. Output ONLY the final English prompt.";
     
     console.log(`Traduzindo prompt do português para o inglês: "${text}"`);
     callChatAPI(sysPrompt, text, (translated) => {
@@ -1492,7 +1492,8 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
         setGenerationStatus("polling", `Processando (${attempts * 3}s)...`);
         
-        fetchWithProxyFallback(`${comfyUrl}/api/history/${promptId}`, {
+        // Use the official Comfy Cloud jobs endpoint instead of history (which is unavailable)
+        fetchWithProxyFallback(`${comfyUrl}/api/jobs/${promptId}`, {
             headers: {
                 "X-API-Key": apiKey
             }
@@ -1502,15 +1503,22 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
             return res.json();
         })
         .then(data => {
-            if (data && data[promptId]) {
+            if (!data) return;
+            
+            // Check status of job on Comfy Cloud
+            if (data.status === "failed") {
                 clearInterval(interval);
-                const historyData = data[promptId];
-                console.log("Geração concluída no ComfyUI!", historyData);
+                throw new Error("A renderização falhou no servidor do ComfyUI.");
+            }
+            
+            if (data.status === "completed") {
+                clearInterval(interval);
+                console.log("Geração concluída no ComfyUI!", data);
                 
                 let filename = "";
-                if (historyData.outputs) {
-                    for (const nodeId in historyData.outputs) {
-                        const nodeOutput = historyData.outputs[nodeId];
+                if (data.outputs) {
+                    for (const nodeId in data.outputs) {
+                        const nodeOutput = data.outputs[nodeId];
                         if (nodeOutput.images && nodeOutput.images[0]) {
                             filename = nodeOutput.images[0].filename;
                             break;
@@ -1549,7 +1557,11 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
             }
         })
         .catch(err => {
+            clearInterval(interval);
+            setGenerationStatus("idle", "Erro");
             console.error("Erro ao verificar histórico do ComfyUI:", err);
+            callback(null);
+            setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
         });
     }, 3000);
 }
