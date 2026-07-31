@@ -1231,8 +1231,9 @@ function fetchWithProxyFallback(url, options) {
         return fetch(routes[index], options)
             .then(res => {
                 // If it is a real application error (like 401 Unauthorized or 403 Forbidden from ComfyUI itself),
-                // we return it because the connection succeeded but the server rejected the key.
-                if (res.ok || res.status === 401 || res.status === 403 || res.status === 400) {
+                // or a 404 (which ComfyUI returns when the job is still queued/processing),
+                // we return it because the connection succeeded.
+                if (res.ok || res.status === 404 || res.status === 401 || res.status === 403 || res.status === 400) {
                     return res;
                 }
                 throw new Error(`HTTP status ${res.status}`);
@@ -1248,22 +1249,25 @@ function fetchWithProxyFallback(url, options) {
 
 // HELPER TO UPDATE VISUAL GENERATION STATUS LIGHT
 function setGenerationStatus(status, label) {
-    const dot = document.getElementById("api-status-dot");
-    const text = document.getElementById("api-status-text");
-    if (!dot || !text) return;
-    
-    dot.className = "status-dot";
-    
-    if (status === "idle") {
-        dot.classList.add("green");
-        text.innerText = label || "Pronto";
-    } else if (status === "creating") {
-        dot.classList.add("red");
-        text.innerText = label || "Conectando...";
-    } else if (status === "polling") {
-        dot.classList.add("yellow");
-        text.innerText = label || "Criando...";
-    }
+    const indicators = document.querySelectorAll(".global-api-status");
+    indicators.forEach(container => {
+        const dot = container.querySelector(".status-dot");
+        const text = container.querySelector(".status-text");
+        if (!dot || !text) return;
+        
+        dot.className = "status-dot";
+        
+        if (status === "idle") {
+            dot.classList.add("green");
+            text.innerText = label || "Pronto";
+        } else if (status === "creating") {
+            dot.classList.add("red");
+            text.innerText = label || "Conectando...";
+        } else if (status === "polling") {
+            dot.classList.add("yellow");
+            text.innerText = label || "Criando...";
+        }
+    });
 }
 
 // DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)

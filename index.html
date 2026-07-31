@@ -238,7 +238,13 @@
             <section id="tab-character-library" class="tab-pane">
                 <div class="pane-header-with-action">
                     <div>
-                        <h1>Character Library</h1>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h1>Character Library</h1>
+                            <div class="api-status-light-container global-api-status" style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                                <span class="status-dot green"></span>
+                                <span class="status-text" style="color: var(--text-secondary);">Pronto</span>
+                            </div>
+                        </div>
                         <p class="pane-description">Gerencie a aparência e os prompts dos seus personagens.</p>
                     </div>
                     <button class="action-btn-primary" id="btn-add-character">
@@ -258,7 +264,13 @@
             <!-- TELA: PAPERBACK COVER -->
             <section id="tab-paperback-cover" class="tab-pane">
                 <div class="pane-header">
-                    <h1>Paperback Cover Designer</h1>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; width: 100%;">
+                        <h1>Paperback Cover Designer</h1>
+                        <div class="api-status-light-container global-api-status" style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                            <span class="status-dot green"></span>
+                            <span class="status-text" style="color: var(--text-secondary);">Pronto</span>
+                        </div>
+                    </div>
                     <p class="pane-description">Crie e configure o template de capa completa (Frontal, Lombada e Traseira).</p>
                 </div>
                 
@@ -323,7 +335,13 @@
             <section id="tab-interior-pages" class="tab-pane">
                 <div class="pane-header-with-action">
                     <div>
-                        <h1>Interior Manga Pages</h1>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h1>Interior Manga Pages</h1>
+                            <div class="api-status-light-container global-api-status" style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                                <span class="status-dot green"></span>
+                                <span class="status-text" style="color: var(--text-secondary);">Pronto</span>
+                            </div>
+                        </div>
                         <p class="pane-description">Crie e organize os quadros, layouts e diálogos das páginas do seu mangá.</p>
                     </div>
                     <button class="action-btn-primary" id="btn-add-page">
@@ -427,10 +445,14 @@
             </section>
         </main>
 
-        <!-- BARRA LATERAL DIREITA: PREVIEW DETALHADO -->
         <aside class="preview-sidebar">
-            <div class="preview-header">
+            <div class="preview-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <h2>Real-time Preview</h2>
+                <!-- Indicador visual de status de geração -->
+                <div class="api-status-light-container" id="api-status-indicator" style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                    <span class="status-dot green" id="api-status-dot"></span>
+                    <span class="status-text" id="api-status-text" style="color: var(--text-secondary);">Pronto</span>
+                </div>
             </div>
             
             <div class="preview-content-box" id="preview-placeholder">
