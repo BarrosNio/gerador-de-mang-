@@ -1215,11 +1215,19 @@ function fetchWithProxyFallback(url, options) {
         return fetch(url, options);
     }
 
+    // Add cache-buster to GET requests to bypass aggressive proxy/CDN caching
+    const method = ((options && options.method) || "GET").toUpperCase();
+    let targetUrl = url;
+    if (method === "GET") {
+        const separator = url.includes("?") ? "&" : "?";
+        targetUrl = `${url}${separator}_t=${Date.now()}`;
+    }
+
     // List of route dispatchers to try in sequence (NO url-encoding for corsproxy.io)
     const routes = [
-        url, // #0: Direct connection (if local CORS extension is active and configured)
-        `https://corsproxy.io/?${url}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
-        `https://cors.lol/?${url}` // #2: CORS.lol (open-source proxy, supports POST and headers)
+        targetUrl, // #0: Direct connection (if local CORS extension is active and configured)
+        `https://corsproxy.io/?${targetUrl}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
+        `https://cors.lol/?${targetUrl}` // #2: CORS.lol (open-source proxy, supports POST and headers)
     ];
 
     function tryRoute(index) {
