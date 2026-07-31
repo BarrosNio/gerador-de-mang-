@@ -1473,9 +1473,6 @@ function executeActualGeneration(prompt, callback) {
             generateMockImage(prompt, callback);
             setTimeout(() => setGenerationStatus("idle", "Pronto"), 3000);
         });
-    } else {
-        generateMockImage(prompt, callback);
-    }
 }
 
 // COMFYUI CLOUD POLLING FUNCTION
