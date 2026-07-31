@@ -1227,7 +1227,8 @@ function fetchWithProxyFallback(url, options) {
     const routes = [
         targetUrl, // #0: Direct connection (if local CORS extension is active and configured)
         `https://corsproxy.io/?${targetUrl}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
-        `https://cors.lol/?${targetUrl}` // #2: CORS.lol (open-source proxy, supports POST and headers)
+        `https://cors.lol/?${targetUrl}`, // #2: CORS.lol (open-source proxy, supports POST and headers)
+        `https://corsproxy.org/?${targetUrl}` // #3: CorsProxy.org (backup proxy, supports GET/POST and headers)
     ];
 
     function tryRoute(index) {
@@ -1238,10 +1239,12 @@ function fetchWithProxyFallback(url, options) {
         console.log(`Tentando rota de rede #${index} para ComfyUI...`);
         return fetch(routes[index], options)
             .then(res => {
-                // If it is a real application error (like 401 Unauthorized or 403 Forbidden from ComfyUI itself),
+                // If it is a real application error (like 401 Unauthorized from ComfyUI itself),
                 // or a 404 (which ComfyUI returns when the job is still queued/processing),
                 // we return it because the connection succeeded.
-                if (res.ok || res.status === 404 || res.status === 401 || res.status === 403 || res.status === 400) {
+                // Note: We DO NOT allow 403 here because S3 redirects often fail with 403 on some proxies,
+                // so we want to trigger proxy rotation to try other proxies.
+                if (res.ok || res.status === 404 || res.status === 401 || res.status === 400) {
                     return res;
                 }
                 throw new Error(`HTTP status ${res.status}`);
