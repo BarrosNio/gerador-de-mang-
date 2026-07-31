@@ -1215,12 +1215,11 @@ function fetchWithProxyFallback(url, options) {
         return fetch(url, options);
     }
 
-    // List of route dispatchers to try in sequence
+    // List of route dispatchers to try in sequence (NO url-encoding for corsproxy.io and cors.lol)
     const routes = [
-        url, // #0: Direct connection
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, // #1: AllOrigins
-        `https://api.codetabs.com/v1/proxy?question=${encodeURIComponent(url)}`, // #2: CodeTabs
-        `https://thingproxy.freeboard.io/fetch/${url}` // #3: ThingProxy (excellent header support)
+        url, // #0: Direct connection (if local CORS extension is active and configured)
+        `https://corsproxy.io/?${url}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
+        `https://cors.lol/?${url}` // #2: CORS.lol (open-source proxy, supports POST and headers)
     ];
 
     function tryRoute(index) {
