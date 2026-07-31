@@ -1292,7 +1292,7 @@ function translatePromptToEnglish(text, callback) {
         return;
     }
     
-    const sysPrompt = "You are an expert manga and manhwa illustrator. Translate the user's Portuguese description or character prompt into a highly detailed, descriptive English prompt optimized for Stable Diffusion XL (Illustrious XL). Include style keywords to achieve a modern manhwa/Solo Leveling look: Solo Leveling style, dark fantasy anime, glowing blue magical energy, electric sparks, sharp cel shading, masterpiece, best quality, rating_safe, source_anime. Output ONLY the final English prompt.";
+    const sysPrompt = "You are an expert manga and anime translator. Translate the user's Portuguese description or character prompt into a highly detailed, descriptive English prompt optimized for Stable Diffusion XL (Illustrious XL). Keep the core theme, colors, and mood of the user's original request. Add relevant high-quality anime tags like: masterpiece, best quality, rating_safe, source_anime, anime style. Do NOT add dark action, glowing, or fantasy tags unless the user's description explicitly suggests them. Output ONLY the final English prompt.";
     
     console.log(`Traduzindo prompt do português para o inglês: "${text}"`);
     callChatAPI(sysPrompt, text, (translated) => {
