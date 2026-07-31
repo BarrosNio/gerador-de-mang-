@@ -105,6 +105,18 @@ function loadStateFromStorage() {
                 saveStateToStorage();
             }
 
+            // Self-healing: Correção automática se o usuário colou o modelo no campo da API Key
+            if (state.api) {
+                const rawKey = (state.api.key || "").trim();
+                if (rawKey.endsWith(".safetensors") || rawKey.toLowerCase().includes("awpainting") || rawKey.toLowerCase().includes("illustrious")) {
+                    console.log("Self-healing: Corrigindo campos de modelo e chave de API trocados pelo usuário.");
+                    state.api.model = rawKey;
+                    state.api.key = "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25";
+                    state.api.provider = "comfyui";
+                    saveStateToStorage();
+                }
+            }
+
             // Força a atualização para o novo provedor de teste ComfyUI se o cache estiver vazio ou com chaves antigas
             if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "" || state.api.provider === "custom") {
                 state.api.provider = "comfyui";
@@ -1168,6 +1180,8 @@ function initAPIConfig() {
         const prov = providerSelect.value;
         if (prov === "mock") {
             statusMsg.innerText = "Usando Gerador Interno Simulado (Sem chave de API necessária).";
+        } else if (prov === "comfyui") {
+            statusMsg.innerText = "Conectado ao ComfyUI Cloud (platform.comfy.org). Requer chave de acesso.";
         } else if (prov === "gemini") {
             statusMsg.innerText = "Requer uma chave de API do Google AI Studio para chamar o Imagen.";
         } else if (prov === "openai") {
