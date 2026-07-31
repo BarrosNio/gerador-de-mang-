@@ -108,7 +108,7 @@ function loadStateFromStorage() {
             // Self-healing: Correção automática se o usuário colou o modelo no campo da API Key
             if (state.api) {
                 const rawKey = (state.api.key || "").trim();
-                if (rawKey.endsWith(".safetensors") || rawKey.toLowerCase().includes("awpainting") || rawKey.toLowerCase().includes("illustrious")) {
+                if (rawKey.endsWith(".safetensors") || rawKey.toLowerCase().includes("awpainting") || rawKey.toLowerCase().includes("illustrious") || rawKey.toLowerCase().includes("animagine")) {
                     console.log("Self-healing: Corrigindo campos de modelo e chave de API trocados pelo usuário.");
                     state.api.model = rawKey;
                     state.api.key = "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25";
@@ -117,8 +117,8 @@ function loadStateFromStorage() {
                 }
             }
 
-            // Força a atualização para o novo provedor de teste ComfyUI se o cache estiver vazio ou com chaves antigas
-            if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "" || state.api.provider === "custom") {
+            // Força a atualização para o provedor ComfyUI se o cache estiver corrompido ou com chaves vazias/erradas
+            if (!state.api.key || state.api.key.startsWith("github_pat_") || state.api.key === "sk_vOSHziutWv3j8Z5mKtqJonHKfYWDN0Zb" || state.api.key === "" || state.api.provider === "openai" || state.api.provider === "custom") {
                 state.api.provider = "comfyui";
                 state.api.key = "comfyui-1c6e8eb8575af1cb47ba7c281b93ba2fbd740c2441c5eb8bf6eaffc9aa912c25";
                 state.api.baseUrl = "";
@@ -1366,6 +1366,12 @@ function executeActualGeneration(prompt, callback) {
                             const normalized = modelInput.toLowerCase().replace(/[^a-z0-9]/g, "");
                             if (!modelInput || normalized === "illustriousxl" || normalized === "illustriousxlv01") {
                                 return "Illustrious-XL-sdxl.safetensors";
+                            }
+                            if (normalized.includes("animagine")) {
+                                if (normalized.includes("4") || normalized.includes("40") || normalized.includes("v4")) {
+                                    return "animagine-xl-4.0-opt.safetensors";
+                                }
+                                return "animagine-xl-3.1.safetensors";
                             }
                             return modelInput;
                         })()
