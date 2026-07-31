@@ -1298,7 +1298,14 @@ function callImageGenerationAPI(prompt, callback) {
                 "4": {
                     "class_type": "CheckpointLoaderSimple",
                     "inputs": {
-                        "ckpt_name": state.api.model || "illustriousXL_v01.safetensors"
+                        "ckpt_name": (function() {
+                            const modelInput = (state.api.model || "").trim();
+                            const normalized = modelInput.toLowerCase().replace(/[^a-z0-9]/g, "");
+                            if (!modelInput || normalized === "illustriousxl" || normalized === "illustriousxlv01") {
+                                return "illustriousXL_v01.safetensors";
+                            }
+                            return modelInput;
+                        })()
                     }
                 },
                 "5": {
