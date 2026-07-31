@@ -1302,7 +1302,7 @@ function callImageGenerationAPI(prompt, callback) {
                             const modelInput = (state.api.model || "").trim();
                             const normalized = modelInput.toLowerCase().replace(/[^a-z0-9]/g, "");
                             if (!modelInput || normalized === "illustriousxl" || normalized === "illustriousxlv01") {
-                                return "illustriousXL_v01.safetensors";
+                                return "Illustrious-XL-sdxl.safetensors";
                             }
                             return modelInput;
                         })()
