@@ -1215,11 +1215,11 @@ function fetchWithProxyFallback(url, options) {
         return fetch(url, options);
     }
 
-    // List of route dispatchers to try in sequence (NO url-encoding for corsproxy.io and cors.lol)
+    // List of route dispatchers to try in sequence (with URL-encoding to preserve target query parameters like &type=output)
     const routes = [
         url, // #0: Direct connection (if local CORS extension is active and configured)
-        `https://corsproxy.io/?${url}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
-        `https://cors.lol/?${url}` // #2: CORS.lol (open-source proxy, supports POST and headers)
+        `https://corsproxy.io/?${encodeURIComponent(url)}`, // #1: CorsProxy.io (active edge proxy, supports POST and headers)
+        `https://cors.lol/?${encodeURIComponent(url)}` // #2: CORS.lol (open-source proxy, supports POST and headers)
     ];
 
     function tryRoute(index) {
@@ -1271,15 +1271,54 @@ function setGenerationStatus(status, label) {
 }
 
 // DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
+// HELPER TO TRANSLATE PORTUGUESE PROMPTS TO ENGLISH USING OPENAI CHAT API IF AVAILABLE
+function translatePromptToEnglish(text, callback) {
+    const openAIKey = state.api.chatKey || (state.api.provider === "openai" ? state.api.key : "");
+    const hasPortuguese = /[áéíóúãõâêôç]/i.test(text) || text.toLowerCase().includes("cabelo") || text.toLowerCase().includes("jaqueta") || text.toLowerCase().includes("olhos") || text.toLowerCase().includes("menino") || text.toLowerCase().includes("menina");
+    
+    if (!openAIKey || !hasPortuguese) {
+        // Fallback to original text if no key is configured or it looks like English already
+        callback(text);
+        return;
+    }
+    
+    const sysPrompt = "You are an expert manga illustrator and prompt engineer. Translate the user's Portuguese description or character visual prompt into a highly detailed, descriptive English prompt optimized for Stable Diffusion XL (Illustrious XL). Include relevant tags and style keywords such as: anime, manga sketch, masterpiece, rating_safe, source_anime, monochrome, lineart if appropriate. Output ONLY the final English prompt. Do not write any explanations or metadata.";
+    
+    console.log(`Traduzindo prompt do português para o inglês: "${text}"`);
+    callChatAPI(sysPrompt, text, (translated) => {
+        if (translated && !translated.startsWith("Erro")) {
+            console.log(`Prompt traduzido e otimizado com sucesso: "${translated}"`);
+            callback(translated);
+        } else {
+            console.warn("Falha na tradução pelo chat. Usando prompt original.");
+            callback(text);
+        }
+    });
+}
+
+// DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
 function callImageGenerationAPI(prompt, callback) {
     const provider = state.api.provider || "mock";
     const apiKey = state.api.key;
     
     if (apiKey && provider !== "mock") {
-        setGenerationStatus("creating", "Gerando arte...");
-        // COMFYUI CLOUD API WORKFLOW INTEGRATION
-        if (provider === "comfyui") {
-            const promptWorkflow = {
+        setGenerationStatus("creating", "Traduzindo...");
+        translatePromptToEnglish(prompt, (translatedPrompt) => {
+            setGenerationStatus("creating", "Gerando arte...");
+            executeActualGeneration(translatedPrompt, callback);
+        });
+    } else {
+        generateMockImage(prompt, callback);
+    }
+}
+
+function executeActualGeneration(prompt, callback) {
+    const provider = state.api.provider || "mock";
+    const apiKey = state.api.key;
+    
+    // COMFYUI CLOUD API WORKFLOW INTEGRATION
+    if (provider === "comfyui") {
+        const promptWorkflow = {
                 "3": {
                     "class_type": "KSampler",
                     "inputs": {
