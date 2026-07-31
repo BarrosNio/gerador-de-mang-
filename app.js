@@ -1282,10 +1282,9 @@ function setGenerationStatus(status, label) {
 // HELPER TO TRANSLATE PORTUGUESE PROMPTS TO ENGLISH USING OPENAI CHAT API IF AVAILABLE
 function translatePromptToEnglish(text, callback) {
     const openAIKey = state.api.chatKey || (state.api.provider === "openai" ? state.api.key : "");
-    const hasPortuguese = /[áéíóúãõâêôç]/i.test(text) || text.toLowerCase().includes("cabelo") || text.toLowerCase().includes("jaqueta") || text.toLowerCase().includes("olhos") || text.toLowerCase().includes("menino") || text.toLowerCase().includes("menina");
     
-    if (!openAIKey || !hasPortuguese) {
-        // Fallback to original text if no key is configured or it looks like English already
+    if (!openAIKey) {
+        // Fallback to original text if no key is configured
         callback(text);
         return;
     }
@@ -1400,7 +1399,7 @@ function executeActualGeneration(prompt, callback) {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-API-Key": apiKey
+                    "Authorization": `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
                     prompt: promptWorkflow,
@@ -1503,7 +1502,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
         // Use the official Comfy Cloud jobs endpoint instead of history (which is unavailable)
         fetchWithProxyFallback(`${comfyUrl}/api/jobs/${promptId}`, {
             headers: {
-                "X-API-Key": apiKey
+                "Authorization": `Bearer ${apiKey}`
             }
         })
         .then(res => {
@@ -1538,7 +1537,9 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
                     
                     fetchWithProxyFallback(imageUrl, {
-                        headers: { "X-API-Key": apiKey }
+                        headers: {
+                            "Authorization": `Bearer ${apiKey}`
+                        }
                     })
                     .then(res => res.blob())
                     .then(blob => {
