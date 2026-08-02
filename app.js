@@ -1355,11 +1355,11 @@ function executeActualGeneration(prompt, callback) {
                     "inputs": {
                         "prompt": prompt,
                         "model": "gpt-image-2",
-                        "model.size": "auto",
-                        "model.custom_width": 1024,
-                        "model.custom_height": 1024,
-                        "model.background": "auto",
-                        "model.quality": "low",
+                        "size": "auto",
+                        "custom_width": 1024,
+                        "custom_height": 1024,
+                        "background": "auto",
+                        "quality": "low",
                         "n": 1,
                         "seed": Math.floor(Math.random() * 100000000)
                     }
