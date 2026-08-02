@@ -186,16 +186,27 @@ function updatePreviewSidebar() {
         renderPageCanvas();
     } else if (state.activeTab === "character-library") {
         placeholder.style.display = "flex";
-        placeholder.innerHTML = `
-            <div class="info-state">
-                <svg class="info-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                </svg>
-                <h3>Personagens: ${state.characters.length}</h3>
-                <p style="margin-top: 8px;">Crie e configure o prompt de cada personagem. Quando enviar uma chave de API, a IA usará estes prompts para gerar ilustrações consistentes.</p>
-            </div>
-        `;
+        // Find if there is any character with a generated image to display in the preview sidebar
+        const lastCharWithImage = [...state.characters].reverse().find(c => c.avatarImage);
+        if (lastCharWithImage) {
+            placeholder.innerHTML = `
+                <div class="preview-char-visual" style="text-align: center; padding: 20px; width: 100%;">
+                    <h3 style="margin-bottom: 15px; color: var(--accent-light);">Visual de ${lastCharWithImage.name}</h3>
+                    <img src="${lastCharWithImage.avatarImage}" style="max-width: 100%; max-height: 70vh; border-radius: 12px; border: 2px solid var(--accent); box-shadow: 0 8px 32px rgba(0,0,0,0.6); object-fit: contain;" />
+                </div>
+            `;
+        } else {
+            placeholder.innerHTML = `
+                <div class="info-state">
+                    <svg class="info-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                    <h3>Personagens: ${state.characters.length}</h3>
+                    <p style="margin-top: 8px;">Crie e configure o prompt de cada personagem. Clique em "Gerar Visual" para criar e exibir a arte aqui.</p>
+                </div>
+            `;
+        }
     }
 }
 
@@ -360,6 +371,7 @@ function renderCharactersList() {
                 char.avatarImage = base64;
                 saveStateToStorage();
                 renderCharactersList();
+                updatePreviewSidebar();
             });
         });
 
@@ -1601,6 +1613,7 @@ function pollComfyUIHistory(comfyUrl, promptId, apiKey, callback) {
 
                 if (filename) {
                     const imageUrl = `${comfyUrl}/api/view?filename=${filename}&type=output`;
+                    console.log("LINK DIRETO DA IMAGEM GERADA (Clique para abrir em nova aba):", imageUrl);
                     
                     fetchWithProxyFallback(imageUrl, {
                         headers: {
