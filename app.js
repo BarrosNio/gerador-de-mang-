@@ -1310,7 +1310,7 @@ function translatePromptToEnglish(text, callback) {
     
     console.log(`Traduzindo prompt do português para o inglês: "${text}"`);
     callChatAPI(sysPrompt, text, (translated) => {
-        if (translated && !translated.startsWith("Erro")) {
+        if (translated && !translated.startsWith("Erro") && !translated.startsWith("Olá!") && !translated.startsWith("Desculpe")) {
             console.log(`Prompt traduzido e otimizado com sucesso: "${translated}"`);
             callback(translated);
         } else {
@@ -1355,11 +1355,11 @@ function executeActualGeneration(prompt, callback) {
                     "inputs": {
                         "prompt": prompt,
                         "model": "gpt-image-2",
-                        "size": "auto",
-                        "custom_width": 1024,
-                        "custom_height": 1024,
-                        "background": "auto",
-                        "quality": "low",
+                        "model.size": "auto",
+                        "model.custom_width": 1024,
+                        "model.custom_height": 1024,
+                        "model.background": "auto",
+                        "model.quality": "low",
                         "n": 1,
                         "seed": Math.floor(Math.random() * 100000000)
                     }
