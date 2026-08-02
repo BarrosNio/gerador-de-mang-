@@ -1418,14 +1418,26 @@ function executeActualGeneration(prompt, callback) {
                 "6": {
                     "class_type": "CLIPTextEncode",
                     "inputs": {
-                        "text": "masterpiece, best quality, manga style, " + prompt,
+                        "text": (function() {
+                            const lower = prompt.toLowerCase();
+                            const prefix = (lower.includes("color") || lower.includes("manhwa") || lower.includes("webtoon") || lower.includes("solo leveling") || lower.includes("page"))
+                                ? "masterpiece, best quality, colored manga style, digital illustration, "
+                                : "masterpiece, best quality, manga style, black and white sketch, ";
+                            return prefix + prompt;
+                        })(),
                         "clip": ["4", 1]
                     }
                 },
                 "7": {
                     "class_type": "CLIPTextEncode",
                     "inputs": {
-                        "text": "bad anatomy, blurry, worst quality, low quality",
+                        "text": (function() {
+                            const lower = prompt.toLowerCase();
+                            const suffix = (lower.includes("color") || lower.includes("manhwa") || lower.includes("webtoon") || lower.includes("solo leveling"))
+                                ? ", monochrome, grayscale, black and white, sketch, line art"
+                                : "";
+                            return "bad anatomy, blurry, worst quality, low quality" + suffix;
+                        })(),
                         "clip": ["4", 1]
                     }
                 },
