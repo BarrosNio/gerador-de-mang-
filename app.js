@@ -79,9 +79,96 @@ document.addEventListener("DOMContentLoaded", () => {
     renderAll();
 });
 
-// STORAGE HELPERS
+// INDEXEDDB UTILITIES FOR LARGE IMAGE STORAGE (BYPASSES LOCALSTORAGE 5MB LIMIT)
+const idbName = "MangaCreatorDB";
+const idbStoreName = "images";
+
+function getIDB() {
+    return new Promise((resolve) => {
+        const request = indexedDB.open(idbName, 1);
+        request.onupgradeneeded = (e) => {
+            e.target.result.createObjectStore(idbStoreName);
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = () => resolve(null);
+    });
+}
+
+function saveImageToIDB(key, base64) {
+    getIDB().then(db => {
+        if (!db) return;
+        try {
+            const tx = db.transaction(idbStoreName, "readwrite");
+            tx.objectStore(idbStoreName).put(base64, key);
+        } catch (e) {
+            console.error("Erro ao salvar imagem no IndexedDB:", e);
+        }
+    });
+}
+
+function loadImageFromIDB(key) {
+    return new Promise((resolve) => {
+        getIDB().then(db => {
+            if (!db) return resolve(null);
+            try {
+                const tx = db.transaction(idbStoreName, "readonly");
+                const req = tx.objectStore(idbStoreName).get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            } catch (e) {
+                console.error("Erro ao ler imagem do IndexedDB:", e);
+                resolve(null);
+            }
+        });
+    });
+}
+
 function saveStateToStorage() {
-    localStorage.setItem("kdp_manga_creator_state", JSON.stringify(state));
+    // 1. Save all base64 images to IndexedDB first
+    if (state.characters) {
+        state.characters.forEach(c => {
+            if (c.avatarImage && c.avatarImage.startsWith("data:image")) {
+                saveImageToIDB("char_" + c.id, c.avatarImage);
+            }
+        });
+    }
+    if (state.cover && state.cover.artImage && state.cover.artImage.startsWith("data:image")) {
+        saveImageToIDB("cover_art", state.cover.artImage);
+    }
+    if (state.pages) {
+        state.pages.forEach(p => {
+            if (p.image && p.image.startsWith("data:image")) {
+                saveImageToIDB("page_" + p.id, p.image);
+            }
+        });
+    }
+
+    // 2. Create clean state clone with image data replaced by pointer strings
+    const cleanState = JSON.parse(JSON.stringify(state));
+    if (cleanState.characters) {
+        cleanState.characters.forEach(c => {
+            if (c.avatarImage && c.avatarImage.startsWith("data:image")) {
+                c.avatarImage = "idb:char_" + c.id;
+            }
+        });
+    }
+    if (cleanState.cover && cleanState.cover.artImage && cleanState.cover.artImage.startsWith("data:image")) {
+        cleanState.cover.artImage = "idb:cover_art";
+    }
+    if (cleanState.pages) {
+        cleanState.pages.forEach(p => {
+            if (p.image && p.image.startsWith("data:image")) {
+                p.image = "idb:page_" + p.id;
+            }
+        });
+    }
+
+    // 3. Save only lightweight JSON to LocalStorage
+    try {
+        localStorage.setItem("kdp_manga_creator_state", JSON.stringify(cleanState));
+    } catch (e) {
+        console.error("Erro crítico: falha ao salvar estado leve no localStorage:", e);
+    }
 }
 
 function loadStateFromStorage() {
@@ -90,6 +177,44 @@ function loadStateFromStorage() {
         try {
             state = { ...state, ...JSON.parse(saved) };
             
+            // Asynchronously fetch large assets from IndexedDB
+            const promises = [];
+            if (state.characters) {
+                state.characters.forEach(c => {
+                    if (c.avatarImage === "idb:char_" + c.id) {
+                        const p = loadImageFromIDB("char_" + c.id).then(img => {
+                            if (img) c.avatarImage = img;
+                        });
+                        promises.push(p);
+                    }
+                });
+            }
+            if (state.cover && state.cover.artImage === "idb:cover_art") {
+                const p = loadImageFromIDB("cover_art").then(img => {
+                    if (img) state.cover.artImage = img;
+                });
+                promises.push(p);
+            }
+            if (state.pages) {
+                state.pages.forEach(p => {
+                    if (p.image === "idb:page_" + p.id) {
+                        const pr = loadImageFromIDB("page_" + p.id).then(img => {
+                            if (img) p.image = img;
+                        });
+                        promises.push(pr);
+                    }
+                });
+            }
+
+            // Once all assets are loaded, re-render the active interfaces
+            Promise.all(promises).then(() => {
+                console.log("IndexedDB: Todos os assets pesados carregados com sucesso.");
+                renderCharactersList();
+                renderCoverCanvas();
+                renderPageCanvas();
+                updatePreviewSidebar();
+            });
+
             // Inicializa apiCosts se não existir no cache antigo
             if (!state.apiCosts) {
                 state.apiCosts = {
