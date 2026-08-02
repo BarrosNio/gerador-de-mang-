@@ -768,127 +768,141 @@ function initInteriorPages() {
     const generateArtBtn = document.getElementById("btn-generate-page-art");
     const exportPageImgBtn = document.getElementById("btn-export-page-image");
 
-    addPageBtn.addEventListener("click", () => {
-        const newPageId = `page-${Date.now()}`;
-        const newPage = {
-            id: newPageId,
-            layout: "1-panel",
-            panels: [{ id: "p1", desc: "Esboço inicial", dialog: "" }],
-            bubbles: []
-        };
-        state.pages.push(newPage);
-        state.activePageId = newPageId;
-        saveStateToStorage();
-        renderInteriorPagesGrid();
-        renderPageEditor();
-        renderPageCanvas();
-    });
+    if (addPageBtn) {
+        addPageBtn.addEventListener("click", () => {
+            const newPageId = `page-${Date.now()}`;
+            const newPage = {
+                id: newPageId,
+                layout: "1-panel",
+                panels: [{ id: "p1", desc: "Esboço inicial", dialog: "" }],
+                bubbles: []
+            };
+            state.pages.push(newPage);
+            state.activePageId = newPageId;
+            saveStateToStorage();
+            renderInteriorPagesGrid();
+            renderPageEditor();
+            renderPageCanvas();
+        });
+    }
 
     // Import ready-made full page image
-    importPageBtn.addEventListener("click", () => {
-        importPageFileInput.click();
-    });
+    if (importPageBtn && importPageFileInput) {
+        importPageBtn.addEventListener("click", () => {
+            importPageFileInput.click();
+        });
 
-    importPageFileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target.result;
-                const newPageId = `page-${Date.now()}`;
-                const newPage = {
-                    id: newPageId,
-                    layout: "full-image",
-                    image: base64,
-                    panels: [],
-                    bubbles: []
+        importPageFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64 = event.target.result;
+                    const newPageId = `page-${Date.now()}`;
+                    const newPage = {
+                        id: newPageId,
+                        layout: "full-image",
+                        image: base64,
+                        panels: [],
+                        bubbles: []
+                    };
+                    state.pages.push(newPage);
+                    state.activePageId = newPageId;
+                    saveStateToStorage();
+                    renderInteriorPagesGrid();
+                    renderPageEditor();
+                    renderPageCanvas();
+                    alert(`Página "${file.name}" importada com sucesso! Você pode movê-la usando os botões "Mover p/ Cima".`);
                 };
-                state.pages.push(newPage);
-                state.activePageId = newPageId;
+                reader.readAsDataURL(file);
+                importPageFileInput.value = ""; // Reset input
+            }
+        });
+    }
+
+    // Reorder Pages listeners
+    if (movePageUpBtn) {
+        movePageUpBtn.addEventListener("click", () => {
+            const index = state.pages.findIndex(p => p.id === state.activePageId);
+            if (index > 0) {
+                const temp = state.pages[index];
+                state.pages[index] = state.pages[index - 1];
+                state.pages[index - 1] = temp;
                 saveStateToStorage();
                 renderInteriorPagesGrid();
                 renderPageEditor();
                 renderPageCanvas();
-                alert(`Página "${file.name}" importada com sucesso! Você pode movê-la usando os botões "Mover p/ Cima".`);
-            };
-            reader.readAsDataURL(file);
-            importPageFileInput.value = ""; // Reset input
-        }
-    });
+            } else {
+                alert("Esta já é a primeira página!");
+            }
+        });
+    }
 
-    // Reorder Pages listeners
-    movePageUpBtn.addEventListener("click", () => {
-        const index = state.pages.findIndex(p => p.id === state.activePageId);
-        if (index > 0) {
-            // Swap pages
-            const temp = state.pages[index];
-            state.pages[index] = state.pages[index - 1];
-            state.pages[index - 1] = temp;
-            saveStateToStorage();
-            renderInteriorPagesGrid();
-            renderPageEditor();
-            renderPageCanvas();
-        } else {
-            alert("Esta já é a primeira página!");
-        }
-    });
+    if (movePageDownBtn) {
+        movePageDownBtn.addEventListener("click", () => {
+            const index = state.pages.findIndex(p => p.id === state.activePageId);
+            if (index >= 0 && index < state.pages.length - 1) {
+                const temp = state.pages[index];
+                state.pages[index] = state.pages[index + 1];
+                state.pages[index + 1] = temp;
+                saveStateToStorage();
+                renderInteriorPagesGrid();
+                renderPageEditor();
+                renderPageCanvas();
+            } else {
+                alert("Esta já é a última página!");
+            }
+        });
+    }
 
-    movePageDownBtn.addEventListener("click", () => {
-        const index = state.pages.findIndex(p => p.id === state.activePageId);
-        if (index >= 0 && index < state.pages.length - 1) {
-            // Swap pages
-            const temp = state.pages[index];
-            state.pages[index] = state.pages[index + 1];
-            state.pages[index + 1] = temp;
-            saveStateToStorage();
-            renderInteriorPagesGrid();
-            renderPageEditor();
-            renderPageCanvas();
-        } else {
-            alert("Esta já é a última página!");
-        }
-    });
+    if (deletePageBtn) {
+        deletePageBtn.addEventListener("click", () => {
+            if (state.pages.length <= 1) {
+                alert("Você precisa manter pelo menos uma página no seu livro.");
+                return;
+            }
+            if (confirm("Deseja realmente excluir esta página?")) {
+                state.pages = state.pages.filter(p => p.id !== state.activePageId);
+                state.activePageId = state.pages[0].id;
+                saveStateToStorage();
+                renderInteriorPagesGrid();
+                renderPageEditor();
+                renderPageCanvas();
+            }
+        });
+    }
 
-    deletePageBtn.addEventListener("click", () => {
-        if (state.pages.length <= 1) {
-            alert("Você precisa manter pelo menos uma página no seu livro.");
-            return;
-        }
-        if (confirm("Deseja realmente excluir esta página?")) {
-            state.pages = state.pages.filter(p => p.id !== state.activePageId);
-            state.activePageId = state.pages[0].id;
-            saveStateToStorage();
-            renderInteriorPagesGrid();
-            renderPageEditor();
-            renderPageCanvas();
-        }
-    });
+    if (addBubbleBtn) {
+        addBubbleBtn.addEventListener("click", () => {
+            const activePage = state.pages.find(p => p.id === state.activePageId);
+            if (activePage) {
+                activePage.bubbles.push({
+                    id: `b-${Date.now()}`,
+                    text: "DIÁLOGO...",
+                    x: 40,
+                    y: 40
+                });
+                saveStateToStorage();
+                renderPageCanvas();
+            }
+        });
+    }
 
-    addBubbleBtn.addEventListener("click", () => {
-        const activePage = state.pages.find(p => p.id === state.activePageId);
-        if (activePage) {
-            activePage.bubbles.push({
-                id: `b-${Date.now()}`,
-                text: "DIÁLOGO...",
-                x: 40,
-                y: 40
-            });
-            saveStateToStorage();
-            renderPageCanvas();
-        }
-    });
+    if (generateArtBtn) {
+        generateArtBtn.addEventListener("click", () => {
+            generatePageSketchesIA();
+        });
+    }
 
-    generateArtBtn.addEventListener("click", () => {
-        generatePageSketchesIA();
-    });
-
-    exportPageImgBtn.addEventListener("click", () => {
-        const canvas = document.getElementById("page-canvas");
-        const link = document.createElement("a");
-        link.download = `manga_page_${state.activePageId}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-    });
+    if (exportPageImgBtn) {
+        exportPageImgBtn.addEventListener("click", () => {
+            const canvas = document.getElementById("page-canvas");
+            const link = document.createElement("a");
+            link.download = `manga_page_${state.activePageId}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    }
 
     // Layout selectors listeners
     document.querySelectorAll(".layout-selector-btn").forEach(btn => {
