@@ -572,6 +572,7 @@ function initCover() {
         state.cover.prompt = e.target.value;
         saveStateToStorage();
     });
+    setupAutocompleteForInput(coverPrompt);
 
     generateBtn.addEventListener("click", () => {
         generateCoverArtIA();
@@ -995,11 +996,13 @@ function renderPageEditor() {
         `;
 
         // Listeners for panel updates
-        card.querySelector(".panel-desc-input").addEventListener("input", (e) => {
+        const descInput = card.querySelector(".panel-desc-input");
+        descInput.addEventListener("input", (e) => {
             activePage.panels[i].desc = e.target.value;
             saveStateToStorage();
             renderPageCanvas();
         });
+        setupAutocompleteForInput(descInput);
 
         card.querySelector(".panel-dialog-input").addEventListener("input", (e) => {
             activePage.panels[i].dialog = e.target.value;
@@ -1611,6 +1614,114 @@ function translatePromptToEnglish(text, callback) {
 }
 
 // REPLACE @MENTIONS WITH CHARACTER DESCRIPTIONS
+// AUTOCOMPLETE DROPDOWN SYSTEM FOR CHARACTER @MENTIONS
+let activeAutocompleteInput = null;
+let autocompleteDropdown = null;
+
+function showAutocompleteDropdown(inputEl, query) {
+    if (!autocompleteDropdown) {
+        autocompleteDropdown = document.createElement("div");
+        autocompleteDropdown.className = "autocomplete-dropdown";
+        document.body.appendChild(autocompleteDropdown);
+    }
+    
+    // Filter characters matching query
+    const matches = (state.characters || []).filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
+    
+    if (matches.length === 0) {
+        hideAutocompleteDropdown();
+        return;
+    }
+    
+    // Position dropdown relative to input element
+    const rect = inputEl.getBoundingClientRect();
+    autocompleteDropdown.style.position = "absolute";
+    autocompleteDropdown.style.left = `${rect.left + window.scrollX}px`;
+    autocompleteDropdown.style.top = `${rect.bottom + window.scrollY + 5}px`;
+    autocompleteDropdown.style.width = `${rect.width}px`;
+    autocompleteDropdown.style.display = "block";
+    autocompleteDropdown.style.zIndex = "99999";
+    autocompleteDropdown.style.background = "#18181c";
+    autocompleteDropdown.style.border = "1px solid var(--accent)";
+    autocompleteDropdown.style.borderRadius = "8px";
+    autocompleteDropdown.style.maxHeight = "200px";
+    autocompleteDropdown.style.overflowY = "auto";
+    autocompleteDropdown.style.boxShadow = "0 8px 32px rgba(0,0,0,0.7)";
+    
+    autocompleteDropdown.innerHTML = matches.map(c => {
+        const avatar = c.avatarImage ? `<div style="width: 28px; height: 28px; border-radius: 50%; background-image: url('${c.avatarImage}'); background-size: cover; background-position: center; border: 1px solid var(--accent);"></div>` : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #27272a; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 1px solid #3f3f46; color: #fff;">${c.name[0]}</div>`;
+        return `
+            <div class="autocomplete-item" data-name="${c.name}" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; font-size: 13px; transition: background 0.2s;">
+                ${avatar}
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #fff;">${c.name}</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);">${c.role}</div>
+                </div>
+            </div>
+        `;
+    }).join("");
+    
+    // Add click listeners to items
+    autocompleteDropdown.querySelectorAll(".autocomplete-item").forEach(item => {
+        item.addEventListener("mousedown", (e) => {
+            // Prevent blur event from firing before mousedown
+            e.preventDefault();
+        });
+        item.addEventListener("click", () => {
+            const name = item.getAttribute("data-name");
+            insertAutocompleteName(inputEl, name);
+        });
+    });
+}
+
+function hideAutocompleteDropdown() {
+    if (autocompleteDropdown) {
+        autocompleteDropdown.style.display = "none";
+    }
+    activeAutocompleteInput = null;
+}
+
+function insertAutocompleteName(inputEl, name) {
+    const val = inputEl.value;
+    const cursor = inputEl.selectionStart;
+    const lastAtIdx = val.lastIndexOf("@", cursor - 1);
+    
+    if (lastAtIdx !== -1) {
+        const before = val.substring(0, lastAtIdx);
+        const after = val.substring(cursor);
+        inputEl.value = before + "@" + name + " " + after;
+        inputEl.focus();
+        const newCursorPos = lastAtIdx + name.length + 2;
+        inputEl.setSelectionRange(newCursorPos, newCursorPos);
+    }
+    hideAutocompleteDropdown();
+}
+
+function setupAutocompleteForInput(inputEl) {
+    if (!inputEl) return;
+    
+    inputEl.addEventListener("input", (e) => {
+        const val = inputEl.value;
+        const cursor = inputEl.selectionStart;
+        const lastAtIdx = val.lastIndexOf("@", cursor - 1);
+        
+        if (lastAtIdx !== -1) {
+            const textSinceAt = val.substring(lastAtIdx + 1, cursor);
+            if (!textSinceAt.includes(" ")) {
+                activeAutocompleteInput = inputEl;
+                showAutocompleteDropdown(inputEl, textSinceAt);
+                return;
+            }
+        }
+        hideAutocompleteDropdown();
+    });
+    
+    inputEl.addEventListener("blur", () => {
+        // Delay to allow item selection click event to process
+        setTimeout(hideAutocompleteDropdown, 150);
+    });
+}
+
 function replaceCharacterMentions(promptText) {
     if (!state.characters || state.characters.length === 0) return promptText;
     
@@ -2291,6 +2402,9 @@ function initIAChat() {
             }
         });
     });
+
+    setupAutocompleteForInput(coverInput);
+    setupAutocompleteForInput(pageInput);
 }
 
 // 8. MULTI-PROJECT MANAGER (NAMED PROJECTS)
