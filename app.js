@@ -1342,7 +1342,39 @@ function executeActualGeneration(prompt, callback) {
     
     // COMFYUI CLOUD API WORKFLOW INTEGRATION
     if (provider === "comfyui") {
-        const promptWorkflow = {
+        const modelInput = (state.api.model || "").trim();
+        const normalized = modelInput.toLowerCase().replace(/[^a-z0-9]/g, "");
+        let promptWorkflow;
+
+        // Verify if using OpenAI GPT Image 2 node on ComfyUI Cloud
+        if (normalized.includes("gpt") || normalized.includes("openai")) {
+            console.log("Detectado modelo GPT Image no ComfyUI Cloud. Carregando workflow OpenAIGPTImageNodeV2...");
+            promptWorkflow = {
+                "6": {
+                    "class_type": "OpenAIGPTImageNodeV2",
+                    "inputs": {
+                        "prompt": prompt,
+                        "model": "gpt-image-2",
+                        "model.size": "auto",
+                        "model.custom_width": 1024,
+                        "model.custom_height": 1024,
+                        "model.background": "auto",
+                        "model.quality": "low",
+                        "n": 1,
+                        "seed": Math.floor(Math.random() * 100000000)
+                    }
+                },
+                "9": {
+                    "class_type": "SaveImage",
+                    "inputs": {
+                        "filename_prefix": "MangaCreator",
+                        "images": ["6", 0]
+                    }
+                }
+            };
+        } else {
+            console.log(`Carregando workflow padrão do KSampler para checkpoint: ${modelInput}`);
+            promptWorkflow = {
                 "3": {
                     "class_type": "KSampler",
                     "inputs": {
@@ -1362,8 +1394,6 @@ function executeActualGeneration(prompt, callback) {
                     "class_type": "CheckpointLoaderSimple",
                     "inputs": {
                         "ckpt_name": (function() {
-                            const modelInput = (state.api.model || "").trim();
-                            const normalized = modelInput.toLowerCase().replace(/[^a-z0-9]/g, "");
                             if (!modelInput || normalized === "illustriousxl" || normalized === "illustriousxlv01") {
                                 return "Illustrious-XL-sdxl.safetensors";
                             }
@@ -1414,6 +1444,7 @@ function executeActualGeneration(prompt, callback) {
                     }
                 }
             };
+        }
 
             const comfyUrl = state.api.baseUrl || "https://cloud.comfy.org";
             console.log(`Enviando prompt para ComfyUI Cloud em ${comfyUrl}/api/prompt (via CORS Proxy)...`);
