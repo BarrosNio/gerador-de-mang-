@@ -1354,47 +1354,74 @@ function renderSpeechBubblesOverlay(page) {
         div.style.left = `${bubble.x}%`;
         div.style.top = `${bubble.y}%`;
 
-        // Make Bubble draggable
+        // Make Bubble draggable (with mouse and touch support)
         let isDragging = false;
-        let startX, startY;
+        let startMouseX, startMouseY;
+        let startBubbleX, startBubbleY;
 
-        div.addEventListener("mousedown", (e) => {
+        function dragStart(clientX, clientY) {
             isDragging = true;
-            startX = e.clientX - div.offsetLeft;
-            startY = e.clientY - div.offsetTop;
+            startMouseX = clientX;
+            startMouseY = clientY;
+            startBubbleX = typeof bubble.x === "number" ? bubble.x : 40;
+            startBubbleY = typeof bubble.y === "number" ? bubble.y : 40;
             document.querySelectorAll(".speech-bubble-item").forEach(b => b.classList.remove("selected"));
             div.classList.add("selected");
-            e.stopPropagation();
-        });
+        }
 
-        document.addEventListener("mousemove", (e) => {
+        function dragMove(clientX, clientY) {
             if (!isDragging) return;
+            const deltaX = clientX - startMouseX;
+            const deltaY = clientY - startMouseY;
             const overlayRect = overlay.getBoundingClientRect();
             
-            let xPx = e.clientX - startX - overlayRect.left;
-            let yPx = e.clientY - startY - overlayRect.top;
-
-            // Convert to percentage
-            let xPct = (xPx / overlayRect.width) * 100;
-            let yPct = (yPx / overlayRect.height) * 100;
-
-            // Bounds
-            xPct = Math.max(0, Math.min(90, xPct));
-            yPct = Math.max(0, Math.min(90, yPct));
-
-            bubble.x = parseFloat(xPct.toFixed(2));
-            bubble.y = parseFloat(yPct.toFixed(2));
-
+            if (overlayRect.width === 0 || overlayRect.height === 0) return;
+            
+            const deltaPctX = (deltaX / overlayRect.width) * 100;
+            const deltaPctY = (deltaY / overlayRect.height) * 100;
+            
+            bubble.x = parseFloat(Math.max(0, Math.min(90, startBubbleX + deltaPctX)).toFixed(2));
+            bubble.y = parseFloat(Math.max(0, Math.min(95, startBubbleY + deltaPctY)).toFixed(2));
+            
             div.style.left = `${bubble.x}%`;
             div.style.top = `${bubble.y}%`;
-        });
+        }
 
-        document.addEventListener("mouseup", () => {
+        function dragEnd() {
             if (isDragging) {
                 isDragging = false;
                 saveStateToStorage();
             }
+        }
+
+        // Mouse Listeners
+        div.addEventListener("mousedown", (e) => {
+            dragStart(e.clientX, e.clientY);
+            e.stopPropagation();
+            e.preventDefault(); // Prevent text selection highlight during drag
         });
+
+        document.addEventListener("mousemove", (e) => {
+            if (isDragging) dragMove(e.clientX, e.clientY);
+        });
+
+        document.addEventListener("mouseup", dragEnd);
+
+        // Touch Listeners (Mobile support)
+        div.addEventListener("touchstart", (e) => {
+            const touch = e.touches[0];
+            dragStart(touch.clientX, touch.clientY);
+            e.stopPropagation();
+        }, { passive: true });
+
+        document.addEventListener("touchmove", (e) => {
+            if (isDragging) {
+                const touch = e.touches[0];
+                dragMove(touch.clientX, touch.clientY);
+            }
+        }, { passive: true });
+
+        document.addEventListener("touchend", dragEnd);
 
         // Double click to edit dialog content or delete
         div.addEventListener("dblclick", () => {
