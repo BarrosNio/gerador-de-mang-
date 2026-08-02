@@ -1644,7 +1644,7 @@ function showAutocompleteDropdown(inputEl, query) {
     autocompleteDropdown.style.background = "#18181c";
     autocompleteDropdown.style.border = "1px solid var(--accent)";
     autocompleteDropdown.style.borderRadius = "8px";
-    autocompleteDropdown.style.maxHeight = "200px";
+    autocompleteDropdown.style.maxHeight = "320px";
     autocompleteDropdown.style.overflowY = "auto";
     autocompleteDropdown.style.boxShadow = "0 8px 32px rgba(0,0,0,0.7)";
     
