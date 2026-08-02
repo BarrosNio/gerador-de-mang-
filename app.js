@@ -140,6 +140,13 @@ function saveStateToStorage() {
             if (p.image && p.image.startsWith("data:image")) {
                 saveImageToIDB("page_" + p.id, p.image);
             }
+            if (p.panels) {
+                p.panels.forEach((panel, idx) => {
+                    if (panel.image && panel.image.startsWith("data:image")) {
+                        saveImageToIDB(`panel_${p.id}_${idx}`, panel.image);
+                    }
+                });
+            }
         });
     }
 
@@ -159,6 +166,13 @@ function saveStateToStorage() {
         cleanState.pages.forEach(p => {
             if (p.image && p.image.startsWith("data:image")) {
                 p.image = "idb:page_" + p.id;
+            }
+            if (p.panels) {
+                p.panels.forEach((panel, idx) => {
+                    if (panel.image && panel.image.startsWith("data:image")) {
+                        panel.image = `idb:panel_${p.id}_${idx}`;
+                    }
+                });
             }
         });
     }
@@ -202,6 +216,16 @@ function loadStateFromStorage() {
                             if (img) p.image = img;
                         });
                         promises.push(pr);
+                    }
+                    if (p.panels) {
+                        p.panels.forEach((panel, idx) => {
+                            if (panel.image === `idb:panel_${p.id}_${idx}`) {
+                                const pr = loadImageFromIDB(`panel_${p.id}_${idx}`).then(img => {
+                                    if (img) panel.image = img;
+                                });
+                                promises.push(pr);
+                            }
+                        });
                     }
                 });
             }
@@ -734,6 +758,10 @@ function wrapText(context, text, x, y, maxWidth, lineHeight) {
 // 4. INTERIOR PAGES WORKSPACE
 function initInteriorPages() {
     const addPageBtn = document.getElementById("btn-add-page");
+    const importPageBtn = document.getElementById("btn-import-page");
+    const importPageFileInput = document.getElementById("input-import-page-file");
+    const movePageUpBtn = document.getElementById("btn-move-page-up");
+    const movePageDownBtn = document.getElementById("btn-move-page-down");
     const deletePageBtn = document.getElementById("btn-delete-page");
     const addBubbleBtn = document.getElementById("btn-add-speech-bubble");
     const generateArtBtn = document.getElementById("btn-generate-page-art");
@@ -753,6 +781,71 @@ function initInteriorPages() {
         renderInteriorPagesGrid();
         renderPageEditor();
         renderPageCanvas();
+    });
+
+    // Import ready-made full page image
+    importPageBtn.addEventListener("click", () => {
+        importPageFileInput.click();
+    });
+
+    importPageFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target.result;
+                const newPageId = `page-${Date.now()}`;
+                const newPage = {
+                    id: newPageId,
+                    layout: "full-image",
+                    image: base64,
+                    panels: [],
+                    bubbles: []
+                };
+                state.pages.push(newPage);
+                state.activePageId = newPageId;
+                saveStateToStorage();
+                renderInteriorPagesGrid();
+                renderPageEditor();
+                renderPageCanvas();
+                alert(`Página "${file.name}" importada com sucesso! Você pode movê-la usando os botões "Mover p/ Cima".`);
+            };
+            reader.readAsDataURL(file);
+            importPageFileInput.value = ""; // Reset input
+        }
+    });
+
+    // Reorder Pages listeners
+    movePageUpBtn.addEventListener("click", () => {
+        const index = state.pages.findIndex(p => p.id === state.activePageId);
+        if (index > 0) {
+            // Swap pages
+            const temp = state.pages[index];
+            state.pages[index] = state.pages[index - 1];
+            state.pages[index - 1] = temp;
+            saveStateToStorage();
+            renderInteriorPagesGrid();
+            renderPageEditor();
+            renderPageCanvas();
+        } else {
+            alert("Esta já é a primeira página!");
+        }
+    });
+
+    movePageDownBtn.addEventListener("click", () => {
+        const index = state.pages.findIndex(p => p.id === state.activePageId);
+        if (index >= 0 && index < state.pages.length - 1) {
+            // Swap pages
+            const temp = state.pages[index];
+            state.pages[index] = state.pages[index + 1];
+            state.pages[index + 1] = temp;
+            saveStateToStorage();
+            renderInteriorPagesGrid();
+            renderPageEditor();
+            renderPageCanvas();
+        } else {
+            alert("Esta já é a última página!");
+        }
     });
 
     deletePageBtn.addEventListener("click", () => {
@@ -919,13 +1012,34 @@ function renderPageEditor() {
 }
 
 function generatePageSketchesIA() {
+    const activePage = state.pages.find(p => p.id === state.activePageId);
+    if (!activePage) return;
+
     if (state.api.key) {
-        alert("Gerando artes estilizadas para os quadros via IA...");
-        // Here we would iterate through panels, generate and draw them
+        alert(`Iniciando geração de arte via IA para os ${activePage.panels.length} quadros desta página. Por favor, aguarde...`);
+        
+        let completed = 0;
+        const total = activePage.panels.length;
+        
+        activePage.panels.forEach((panel, index) => {
+            console.log(`Gerando arte para Painel Q${index + 1}: "${panel.desc}"`);
+            setGenerationStatus("creating", `Gerando Q${index + 1}...`);
+            
+            callImageGenerationAPI(panel.desc || "empty manga panel scene", (base64) => {
+                if (base64) {
+                    panel.image = base64;
+                    saveStateToStorage();
+                    renderPageCanvas(); // Draw it immediately
+                }
+                completed++;
+                if (completed === total) {
+                    setGenerationStatus("idle", "Pronto");
+                    alert("Todas as artes dos quadros foram geradas e desenhadas na página!");
+                }
+            });
+        });
     } else {
-        alert("Simulando esboços rápidos de mangá...");
-        // Redraw will draw simulated sketches anyway, so just trigger a re-render
-        renderPageCanvas();
+        alert("Nenhuma chave de API de ComfyUI configurada. Vá no menu de configurações (engrenagem) para cadastrar.");
     }
 }
 
@@ -950,6 +1064,30 @@ function renderPageCanvas() {
 
     // Draw panels depending on layout
     const layout = activePage.layout;
+    
+    if (layout === "full-image") {
+        if (activePage.image && activePage.image.startsWith("data:image")) {
+            const img = new Image();
+            img.src = activePage.image;
+            if (img.complete) {
+                ctx.drawImage(img, 0, 0, w, h);
+            } else {
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, w, h);
+                };
+            }
+        } else {
+            ctx.fillStyle = "#e4e4e7";
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = "#71717a";
+            ctx.font = "italic 16px Outfit";
+            ctx.textAlign = "center";
+            ctx.fillText("Imagem importada vazia ou indisponível", w / 2, h / 2);
+        }
+        renderSpeechBubblesOverlay(activePage);
+        return;
+    }
+
     let panelAreas = [];
 
     if (layout === "1-panel") {
@@ -1057,6 +1195,21 @@ function drawPanelSketch(ctx, area, panelData, panelNum) {
         ctx.rect(area.x, area.y, area.w, area.h);
     }
     ctx.clip();
+
+    // Render AI generated panel image if present
+    if (panelData.image && panelData.image.startsWith("data:image")) {
+        const img = new Image();
+        img.src = panelData.image;
+        if (img.complete) {
+            ctx.drawImage(img, area.x, area.y, area.w, area.h);
+        } else {
+            img.onload = () => {
+                ctx.drawImage(img, area.x, area.y, area.w, area.h);
+            };
+        }
+        ctx.restore();
+        return;
+    }
 
     // Draw speed lines or dramatic action lines
     ctx.strokeStyle = "rgba(0, 0, 0, 0.1)";
@@ -1457,14 +1610,41 @@ function translatePromptToEnglish(text, callback) {
     });
 }
 
+// REPLACE @MENTIONS WITH CHARACTER DESCRIPTIONS
+function replaceCharacterMentions(promptText) {
+    if (!state.characters || state.characters.length === 0) return promptText;
+    
+    let processedPrompt = promptText;
+    
+    // Sort characters by name length descending to avoid substring collision
+    const sortedChars = [...state.characters].sort((a, b) => b.name.length - a.name.length);
+    
+    sortedChars.forEach(char => {
+        const escapedName = char.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`@${escapedName}\\b`, 'gi');
+        
+        if (regex.test(processedPrompt)) {
+            const charDesc = char.desc ? `, appearance: ${char.desc}` : "";
+            const charDetails = `${char.name} (${charDesc})`;
+            processedPrompt = processedPrompt.replace(regex, charDetails);
+        }
+    });
+    
+    return processedPrompt;
+}
+
 // DYNAMIC AI IMAGE GENERATION CONNECTOR (OPENAI / CUSTOM PROXY / COMFYUI)
 function callImageGenerationAPI(prompt, callback) {
     const provider = state.api.provider || "mock";
     const apiKey = state.api.key;
     
+    // Process character @ mentions
+    const processedPrompt = replaceCharacterMentions(prompt);
+    console.log(`Prompt processado com menções: "${processedPrompt}"`);
+    
     if (apiKey && provider !== "mock") {
         setGenerationStatus("creating", "Traduzindo...");
-        translatePromptToEnglish(prompt, (translatedPrompt) => {
+        translatePromptToEnglish(processedPrompt, (translatedPrompt) => {
             setGenerationStatus("creating", "Gerando arte...");
             executeActualGeneration(translatedPrompt, callback);
         });

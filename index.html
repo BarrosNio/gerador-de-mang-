@@ -344,13 +344,24 @@
                         </div>
                         <p class="pane-description">Crie e organize os quadros, layouts e diálogos das páginas do seu mangá.</p>
                     </div>
-                    <button class="action-btn-primary" id="btn-add-page">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        <span>Nova Página</span>
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="action-btn-primary" id="btn-add-page">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span>Nova Página</span>
+                        </button>
+                        <button class="action-btn-secondary" id="btn-import-page" style="background: rgba(var(--accent-rgb), 0.15); color: var(--accent-light); border: 1px solid var(--accent); display: flex; align-items: center; gap: 6px; padding: 0 12px; cursor: pointer; border-radius: 6px;">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <span>Importar Página</span>
+                            <input type="file" id="input-import-page-file" style="display: none;" accept="image/*">
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="interior-workspace">
@@ -366,7 +377,11 @@
                     <div class="page-editor-container" id="page-editor" style="display: none;">
                         <div class="editor-header">
                             <h3 id="current-page-title">Editando Página 1</h3>
-                            <button class="delete-btn-danger" id="btn-delete-page">Excluir Página</button>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="action-btn-secondary" id="btn-move-page-up" style="padding: 4px 8px; font-size: 11px; height: 32px;">Mover p/ Cima</button>
+                                <button class="action-btn-secondary" id="btn-move-page-down" style="padding: 4px 8px; font-size: 11px; height: 32px;">Mover p/ Baixo</button>
+                                <button class="delete-btn-danger" id="btn-delete-page">Excluir Página</button>
+                            </div>
                         </div>
                         
                         <div class="editor-settings">
