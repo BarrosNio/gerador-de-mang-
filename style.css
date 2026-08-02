@@ -812,6 +812,29 @@ canvas {
     outline: 2px solid #3b82f6;
 }
 
+.speech-bubble-item {
+    transform-origin: center center;
+}
+
+.bubble-rotate-handle {
+    display: none;
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    background-color: #3b82f6;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    cursor: alias;
+    z-index: 10;
+}
+
+.speech-bubble-item.selected .bubble-rotate-handle {
+    display: block;
+}
+
 /* MODAL STYLING */
 .modal-overlay {
     position: fixed;
@@ -1214,5 +1237,50 @@ canvas {
     .modal-card {
         width: 100%;
         border-radius: 12px;
+    }
+}
+
+/* STATUS DOT LIGHT INDICATOR */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+.status-dot.green {
+    background-color: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+.status-dot.red {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    animation: pulse-red 1s infinite alternate;
+}
+.status-dot.yellow {
+    background-color: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+    animation: pulse-yellow 1s infinite alternate;
+}
+
+@keyframes pulse-red {
+    from {
+        opacity: 0.6;
+        box-shadow: 0 0 4px #ef4444;
+    }
+    to {
+        opacity: 1;
+        box-shadow: 0 0 12px #ef4444;
+    }
+}
+
+@keyframes pulse-yellow {
+    from {
+        opacity: 0.6;
+        box-shadow: 0 0 4px #f59e0b;
+    }
+    to {
+        opacity: 1;
+        box-shadow: 0 0 12px #f59e0b;
     }
 }

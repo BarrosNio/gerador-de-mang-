@@ -1353,11 +1353,22 @@ function renderSpeechBubblesOverlay(page) {
         div.innerText = bubble.text;
         div.style.left = `${bubble.x}%`;
         div.style.top = `${bubble.y}%`;
+        
+        // Apply saved rotation if present
+        if (bubble.rotation) {
+            div.style.transform = `rotate(${bubble.rotation}deg)`;
+        }
 
-        // Make Bubble draggable (with mouse and touch support)
+        // Add rotate handle inside the bubble
+        const rotateHandle = document.createElement("div");
+        rotateHandle.className = "bubble-rotate-handle";
+        div.appendChild(rotateHandle);
+
         let isDragging = false;
+        let isRotating = false;
         let startMouseX, startMouseY;
         let startBubbleX, startBubbleY;
+        let bubbleCenterX, bubbleCenterY;
 
         function dragStart(clientX, clientY) {
             isDragging = true;
@@ -1369,59 +1380,89 @@ function renderSpeechBubblesOverlay(page) {
             div.classList.add("selected");
         }
 
-        function dragMove(clientX, clientY) {
-            if (!isDragging) return;
-            const deltaX = clientX - startMouseX;
-            const deltaY = clientY - startMouseY;
-            const overlayRect = overlay.getBoundingClientRect();
-            
-            if (overlayRect.width === 0 || overlayRect.height === 0) return;
-            
-            const deltaPctX = (deltaX / overlayRect.width) * 100;
-            const deltaPctY = (deltaY / overlayRect.height) * 100;
-            
-            bubble.x = parseFloat(Math.max(0, Math.min(90, startBubbleX + deltaPctX)).toFixed(2));
-            bubble.y = parseFloat(Math.max(0, Math.min(95, startBubbleY + deltaPctY)).toFixed(2));
-            
-            div.style.left = `${bubble.x}%`;
-            div.style.top = `${bubble.y}%`;
+        function rotateStart(clientX, clientY) {
+            isRotating = true;
+            const rect = div.getBoundingClientRect();
+            bubbleCenterX = rect.left + rect.width / 2;
+            bubbleCenterY = rect.top + rect.height / 2;
+            document.querySelectorAll(".speech-bubble-item").forEach(b => b.classList.remove("selected"));
+            div.classList.add("selected");
         }
 
-        function dragEnd() {
+        function handleMove(clientX, clientY) {
             if (isDragging) {
+                const deltaX = clientX - startMouseX;
+                const deltaY = clientY - startMouseY;
+                const overlayRect = overlay.getBoundingClientRect();
+                
+                if (overlayRect.width === 0 || overlayRect.height === 0) return;
+                
+                const deltaPctX = (deltaX / overlayRect.width) * 100;
+                const deltaPctY = (deltaY / overlayRect.height) * 100;
+                
+                bubble.x = parseFloat(Math.max(0, Math.min(90, startBubbleX + deltaPctX)).toFixed(2));
+                bubble.y = parseFloat(Math.max(0, Math.min(95, startBubbleY + deltaPctY)).toFixed(2));
+                
+                div.style.left = `${bubble.x}%`;
+                div.style.top = `${bubble.y}%`;
+            } else if (isRotating) {
+                const angleRad = Math.atan2(clientY - bubbleCenterY, clientX - bubbleCenterX);
+                let angleDeg = angleRad * (180 / Math.PI);
+                // Adjust by 90 degrees since handle is on top
+                angleDeg = (angleDeg + 90) % 360;
+                bubble.rotation = parseFloat(angleDeg.toFixed(1));
+                div.style.transform = `rotate(${bubble.rotation}deg)`;
+            }
+        }
+
+        function handleEnd() {
+            if (isDragging || isRotating) {
                 isDragging = false;
+                isRotating = false;
                 saveStateToStorage();
             }
         }
 
-        // Mouse Listeners
+        // Mouse Drag events
         div.addEventListener("mousedown", (e) => {
+            if (e.target === rotateHandle) return; // Let rotate event handle it
             dragStart(e.clientX, e.clientY);
             e.stopPropagation();
-            e.preventDefault(); // Prevent text selection highlight during drag
+            e.preventDefault();
+        });
+
+        // Mouse Rotate events
+        rotateHandle.addEventListener("mousedown", (e) => {
+            rotateStart(e.clientX, e.clientY);
+            e.stopPropagation();
+            e.preventDefault();
         });
 
         document.addEventListener("mousemove", (e) => {
-            if (isDragging) dragMove(e.clientX, e.clientY);
+            handleMove(e.clientX, e.clientY);
         });
 
-        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("mouseup", handleEnd);
 
-        // Touch Listeners (Mobile support)
+        // Touch Drag/Rotate events (Mobile)
         div.addEventListener("touchstart", (e) => {
             const touch = e.touches[0];
-            dragStart(touch.clientX, touch.clientY);
+            if (e.target === rotateHandle) {
+                rotateStart(touch.clientX, touch.clientY);
+            } else {
+                dragStart(touch.clientX, touch.clientY);
+            }
             e.stopPropagation();
         }, { passive: true });
 
         document.addEventListener("touchmove", (e) => {
-            if (isDragging) {
+            if (isDragging || isRotating) {
                 const touch = e.touches[0];
-                dragMove(touch.clientX, touch.clientY);
+                handleMove(touch.clientX, touch.clientY);
             }
         }, { passive: true });
 
-        document.addEventListener("touchend", dragEnd);
+        document.addEventListener("touchend", handleEnd);
 
         // Double click to edit dialog content or delete
         div.addEventListener("dblclick", () => {
