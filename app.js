@@ -2690,19 +2690,32 @@ function initProjectManager() {
             qrSyncBtn.innerText = "Preparando QR Code...";
 
             createExportableStateBundle((bundle) => {
-                // Post full project state to JSONBlob
+                // Post full project state to JSONBlob using text/plain to bypass CORS preflight
                 fetch("https://jsonblob.com/api/jsonBlob", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
+                        "Content-Type": "text/plain"
                     },
                     body: JSON.stringify(bundle)
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error("Direct upload returned non-2xx status");
+                    return res;
+                })
+                .catch(err => {
+                    console.warn("Upload direto falhou. Tentando via CORS Proxy...", err);
+                    return fetch("https://corsproxy.io/?https://jsonblob.com/api/jsonBlob", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "text/plain"
+                        },
+                        body: JSON.stringify(bundle)
+                    });
                 })
                 .then(blobResponse => {
                     if (!blobResponse.ok) throw new Error("Erro ao criar link de compartilhamento.");
                     const blobUrl = blobResponse.headers.get("Location");
-                    if (!blobUrl) throw new Error("Erro na resposta do servidor.");
+                    if (!blobUrl) throw new Error("Erro na resposta do servidor (Location header ausente).");
                     return blobUrl;
                 })
                 .then(blobUrl => {
@@ -3081,6 +3094,14 @@ function checkQRShareUrl() {
     console.log(`Parâmetro de QR Code encontrado. Baixando blob ID: ${blobId}`);
 
     fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
+    .then(res => {
+        if (!res.ok) throw new Error("Direct GET failed");
+        return res;
+    })
+    .catch(() => {
+        console.warn("Download direto do JSONBlob falhou. Tentando via CORS Proxy...");
+        return fetch(`https://corsproxy.io/?https://jsonblob.com/api/jsonBlob/${blobId}`);
+    })
     .then(response => {
         if (!response.ok) throw new Error("Erro ao baixar dados do servidor.");
         return response.json();
