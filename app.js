@@ -1496,6 +1496,7 @@ function initAPIConfig() {
     const chatKeyInput = document.getElementById("api-chat-key-input");
     const baseUrlInput = document.getElementById("api-base-url");
     const modelInput = document.getElementById("api-model");
+    const githubTokenInput = document.getElementById("github-token-input");
     const statusMsg = document.getElementById("api-status-msg");
 
     btnOpen.addEventListener("click", () => {
@@ -1505,6 +1506,9 @@ function initAPIConfig() {
         chatKeyInput.value = state.api.chatKey || "";
         baseUrlInput.value = state.api.baseUrl || "";
         modelInput.value = state.api.model || "Illustrious XL";
+        if (githubTokenInput) {
+            githubTokenInput.value = localStorage.getItem("kdp_manga_github_token") || "";
+        }
         updateAPIStatusLabel();
         modal.classList.add("active");
     });
@@ -1518,6 +1522,9 @@ function initAPIConfig() {
         state.api.chatKey = chatKeyInput.value.trim();
         state.api.baseUrl = baseUrlInput.value.trim();
         state.api.model = modelInput.value.trim();
+        if (githubTokenInput) {
+            localStorage.setItem("kdp_manga_github_token", githubTokenInput.value.trim());
+        }
         
         saveStateToStorage();
         modal.classList.remove("active");
@@ -2690,33 +2697,55 @@ function initProjectManager() {
             qrSyncBtn.innerText = "Preparando QR Code...";
 
             createExportableStateBundle((bundle) => {
-                uploadToJSONBlob(bundle, (blobUrl) => {
-                    const blobId = blobUrl.split("/").pop();
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?p=${blobId}`;
-                    
-                    // Generate QR code using public free API
-                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
-                    
-                    qrImg.src = qrApiUrl;
-                    qrLinkInput.value = shareUrl;
-                    
-                    // Open modal
-                    if (qrModal) qrModal.style.display = "flex";
-                    
-                    qrSyncBtn.disabled = false;
-                    qrSyncBtn.innerHTML = `
-                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                        <span>Sincronizar no Celular (QR Code)</span>
-                    `;
-                }, (err) => {
-                    console.error("Erro ao gerar QR Code:", err);
-                    alert(`Não foi possível sincronizar no momento: ${err.message}`);
-                    qrSyncBtn.disabled = false;
-                    qrSyncBtn.innerHTML = `
-                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                        <span>Sincronizar no Celular (QR Code)</span>
-                    `;
-                });
+                const token = localStorage.getItem("kdp_manga_github_token");
+                if (token) {
+                    qrSyncBtn.innerText = "Enviando para GitHub Gist...";
+                    uploadToGitHubGist(bundle, (gistId) => {
+                        const shareUrl = `${window.location.origin}${window.location.pathname}?g=${gistId}`;
+                        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+                        qrImg.src = qrApiUrl;
+                        qrLinkInput.value = shareUrl;
+                        
+                        if (qrModal) qrModal.style.display = "flex";
+                        qrSyncBtn.disabled = false;
+                        qrSyncBtn.innerHTML = `
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            <span>Sincronizar no Celular (QR Code)</span>
+                        `;
+                    }, (err) => {
+                        console.error("Erro ao gerar QR Code via Gist:", err);
+                        alert(`Erro ao sincronizar via GitHub: ${err.message}`);
+                        qrSyncBtn.disabled = false;
+                        qrSyncBtn.innerHTML = `
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            <span>Sincronizar no Celular (QR Code)</span>
+                        `;
+                    });
+                } else {
+                    uploadToJSONBlob(bundle, (blobUrl) => {
+                        const blobId = blobUrl.split("/").pop();
+                        const shareUrl = `${window.location.origin}${window.location.pathname}?p=${blobId}`;
+                        
+                        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+                        qrImg.src = qrApiUrl;
+                        qrLinkInput.value = shareUrl;
+                        
+                        if (qrModal) qrModal.style.display = "flex";
+                        qrSyncBtn.disabled = false;
+                        qrSyncBtn.innerHTML = `
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            <span>Sincronizar no Celular (QR Code)</span>
+                        `;
+                    }, (err) => {
+                        console.error("Erro ao gerar QR Code via JSONBlob:", err);
+                        alert(`Não foi possível sincronizar no momento: ${err.message}`);
+                        qrSyncBtn.disabled = false;
+                        qrSyncBtn.innerHTML = `
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            <span>Sincronizar no Celular (QR Code)</span>
+                        `;
+                    });
+                }
             });
         });
     }
@@ -2839,6 +2868,92 @@ function uploadToJSONBlob(bundle, onSuccess, onError) {
     });
 }
 
+// HELPER TO UPLOAD BUNDLE TO GITHUB GIST FOR PERMANENT FREE UNLIMITED CLOUD SYNC
+function uploadToGitHubGist(bundle, onSuccess, onError) {
+    const token = localStorage.getItem("kdp_manga_github_token");
+    if (!token) {
+        onError(new Error("GitHub Token não configurado. Por favor, clique na engrenagem de Configurações e cole seu token do GitHub."));
+        return;
+    }
+    
+    const projName = document.getElementById("project-save-name").value.trim() || "Meu_Projeto_Manga";
+    const gistKey = `kdp_manga_gist_id_${projName.replace(/ /g, "_")}`;
+    let gistId = localStorage.getItem(gistKey);
+    
+    const gistData = {
+        description: `KDP Manga Project: ${projName}`,
+        public: false,
+        files: {
+            "project.json": {
+                content: JSON.stringify(bundle)
+            }
+        }
+    };
+    
+    const url = gistId ? `https://api.github.com/gists/${gistId}` : "https://api.github.com/gists";
+    const method = gistId ? "PATCH" : "POST";
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            "Authorization": `token ${token}`,
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json"
+        },
+        body: JSON.stringify(gistData)
+    })
+    .then(res => {
+        if (res.status === 404 && gistId) {
+            // Gist was deleted on GitHub, try creating a new one
+            localStorage.removeItem(gistKey);
+            return fetch("https://api.github.com/gists", {
+                method: "POST",
+                headers: {
+                    "Authorization": `token ${token}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/vnd.github.v3+json"
+                },
+                body: JSON.stringify(gistData)
+            });
+        }
+        if (!res.ok) throw new Error(`Github API retornou HTTP ${res.status}`);
+        return res;
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.id) throw new Error("ID do Gist não retornado.");
+        localStorage.setItem(gistKey, data.id);
+        onSuccess(data.id);
+    })
+    .catch(err => {
+        onError(err);
+    });
+}
+
+function downloadFromGitHubGist(gistId, onSuccess, onError) {
+    const token = localStorage.getItem("kdp_manga_github_token");
+    const headers = {
+        "Accept": "application/vnd.github.v3+json"
+    };
+    if (token) {
+        headers["Authorization"] = `token ${token}`;
+    }
+    
+    fetch(`https://api.github.com/gists/${gistId}`, { headers })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        if (!data.files || !data.files["project.json"]) throw new Error("Arquivo project.json não encontrado no Gist.");
+        const content = data.files["project.json"].content;
+        onSuccess(JSON.parse(content));
+    })
+    .catch(err => {
+        onError(err);
+    });
+}
+
 // 9. CLOUD SYNC MANAGER (CROSS-DEVICE SYNC)
 function initCloudSync() {
     const syncCodeInput = document.getElementById("project-sync-code");
@@ -2878,54 +2993,70 @@ function initCloudSync() {
         updateCloudProjectsDropdown();
     });
 
-    // Upload to Cloud (Hybrid JSONBlob + KVDB.io strategy to support large image payloads)
+    // Upload to Cloud (Switches between GitHub Gist and KVDB/JSONBlob automatically based on Token configuration)
     syncToBtn.addEventListener("click", () => {
         const projName = document.getElementById("project-save-name").value.trim() || "Meu_Projeto_Manga";
         const formattedProjName = projName.replace(/ /g, "_");
-        const code = syncCodeInput.value.trim().toUpperCase();
+        const token = localStorage.getItem("kdp_manga_github_token");
         
-        if (!code) {
-            alert("Insira ou gere um código de sincronização.");
-            return;
-        }
-
         syncToBtn.disabled = true;
-        syncToBtn.innerText = "Preparando dados...";
-
-        // First resolve local IndexedDB images so they are actually uploaded
-        createExportableStateBundle((bundle) => {
-            uploadToJSONBlob(bundle, (blobUrl) => {
-                syncToBtn.innerText = "Registrando atalho (KVDB)...";
-                // 2. Save only the small URL pointer in KVDB.io under the sync code
-                fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ url: blobUrl })
-                })
-                .then(kvResponse => {
-                    if (!kvResponse.ok) {
-                        throw new Error("Erro ao salvar atalho no banco de códigos.");
-                    }
-                    alert(`Projeto "${projName}" enviado com sucesso para a nuvem sob o código "${code}"!`);
+        
+        if (token) {
+            syncToBtn.innerText = "Sincronizando no GitHub...";
+            createExportableStateBundle((bundle) => {
+                uploadToGitHubGist(bundle, (gistId) => {
+                    alert(`Projeto "${projName}" sincronizado com sucesso no seu GitHub Gist privado!`);
                     updateCloudProjectsDropdown();
-                })
-                .catch(err => {
-                    console.error("Erro no Cloud Sync Upload:", err);
-                    alert(`Falha ao salvar na nuvem: ${err.message}`);
-                })
-                .finally(() => {
+                    syncToBtn.disabled = false;
+                    syncToBtn.innerText = "Salvar na Nuvem";
+                }, (err) => {
+                    console.error("Erro no GitHub Sync:", err);
+                    alert(`Falha ao sincronizar no GitHub: ${err.message}`);
                     syncToBtn.disabled = false;
                     syncToBtn.innerText = "Salvar na Nuvem";
                 });
-            }, (err) => {
-                console.error("Erro no Cloud Sync Upload (JSONBlob):", err);
-                alert(`Falha ao salvar na nuvem: ${err.message}`);
+            });
+        } else {
+            // Fallback to legacy KVDB / JSONBlob system (displays warning about temporary server limits)
+            const code = syncCodeInput.value.trim().toUpperCase();
+            if (!code) {
+                alert("Insira ou gere um código de sincronização.");
                 syncToBtn.disabled = false;
                 syncToBtn.innerText = "Salvar na Nuvem";
+                return;
+            }
+            
+            syncToBtn.innerText = "Sincronizando via Servidor Público...";
+            createExportableStateBundle((bundle) => {
+                uploadToJSONBlob(bundle, (blobUrl) => {
+                    syncToBtn.innerText = "Registrando código (KVDB)...";
+                    fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ url: blobUrl })
+                    })
+                    .then(kvResponse => {
+                        if (!kvResponse.ok) throw new Error("Erro ao registrar no servidor público KVDB.");
+                        alert(`Projeto "${projName}" enviado para o servidor público sob o código "${code}"! Nota: Pode expirar após alguns dias.`);
+                        updateCloudProjectsDropdown();
+                    })
+                    .catch(err => {
+                        console.error("Erro no Legacy Cloud Sync:", err);
+                        alert(`Falha ao salvar no servidor público: ${err.message}`);
+                    })
+                    .finally(() => {
+                        syncToBtn.disabled = false;
+                        syncToBtn.innerText = "Salvar na Nuvem";
+                    });
+                }, (err) => {
+                    alert(`Falha ao salvar no servidor público: ${err.message}`);
+                    syncToBtn.disabled = false;
+                    syncToBtn.innerText = "Salvar na Nuvem";
+                });
             });
-        });
+        }
     });
 
     // Download/Load Selected from Cloud
@@ -2933,93 +3064,160 @@ function initCloudSync() {
         const selectedKey = e.target.value;
         if (!selectedKey) return;
 
-        const code = syncCodeInput.value.trim().toUpperCase();
-        const displayProjName = selectedKey.substring(code.length + 1).replace(/_/g, " ");
+        const token = localStorage.getItem("kdp_manga_github_token");
+        const displayProjName = selectDropdown.options[selectDropdown.selectedIndex].text;
 
-        if (confirm(`Deseja carregar o projeto "${displayProjName}" da nuvem? Isso substituirá suas modificações atuais não salvas.`)) {
+        if (confirm(`Deseja carregar o projeto "${displayProjName}" da nuvem? Isso substituirá suas modificações locais atuais.`)) {
+            const overlay = document.getElementById("cloud-loading-overlay");
+            if (overlay) overlay.style.display = "flex";
             
-            // 1. Fetch the pointer JSON from KVDB
-            fetch(`${BUCKET_URL}/${selectedKey}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Erro ao baixar atalho do projeto.");
-                }
-                return response.json();
-            })
-            .then(data => {
-                const targetUrl = data.url;
-                if (!targetUrl) {
-                    throw new Error("Atalho inválido ou corrompido.");
-                }
-                // 2. Fetch the actual large state payload from JSONBlob
-                return fetch(targetUrl);
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Erro ao baixar dados completos do projeto.");
-                }
-                return response.json();
-            })
-            .then(loadedState => {
-                state = { ...state, ...loadedState };
-                
-                // Sync inputs
-                document.getElementById("project-save-name").value = displayProjName;
-                document.getElementById("series-title").value = state.title || "";
-                document.getElementById("author-name").value = state.author || "";
-                document.getElementById("page-count").value = state.pageCount || 50;
-                document.getElementById("paper-type").value = state.paperType || "premium-cream";
+            if (token) {
+                // Fetch directly from GitHub Gist
+                downloadFromGitHubGist(selectedKey, (loadedState) => {
+                    state = { ...state, ...loadedState };
+                    
+                    // Sync UI inputs
+                    document.getElementById("project-save-name").value = displayProjName;
+                    if (document.getElementById("series-title")) document.getElementById("series-title").value = state.title || "";
+                    if (document.getElementById("author-name")) document.getElementById("author-name").value = state.author || "";
+                    if (document.getElementById("page-count")) document.getElementById("page-count").value = state.pageCount || 50;
+                    if (document.getElementById("paper-type")) document.getElementById("paper-type").value = state.paperType || "premium-cream";
 
-                saveStateToStorage();
-                updateSpineWidth();
-                renderAll();
-                
-                alert(`Projeto "${displayProjName}" carregado com sucesso da nuvem!`);
-            })
-            .catch(err => {
-                console.error("Erro no Cloud Sync Download:", err);
-                alert(`Erro na sincronização: ${err.message}`);
-            });
+                    saveStateToStorage();
+                    updateSpineWidth();
+                    renderAll();
+                    
+                    if (overlay) overlay.style.display = "none";
+                    alert(`Projeto "${displayProjName}" carregado com sucesso do seu GitHub Gist!`);
+                }, (err) => {
+                    console.error("Erro ao carregar do GitHub Gist:", err);
+                    if (overlay) overlay.style.display = "none";
+                    alert(`Falha ao carregar do GitHub Gist: ${err.message}`);
+                });
+            } else {
+                // Fetch from legacy KVDB pointer and JSONBlob
+                fetch(`${BUCKET_URL}/${selectedKey}`)
+                .then(response => {
+                    if (!response.ok) throw new Error("Atalho não encontrado no servidor público.");
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.url) throw new Error("Atalho corrompido.");
+                    return fetch(data.url);
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error("Erro ao baixar dados do projeto.");
+                    return response.json();
+                })
+                .then(loadedState => {
+                    state = { ...state, ...loadedState };
+                    
+                    document.getElementById("project-save-name").value = displayProjName;
+                    if (document.getElementById("series-title")) document.getElementById("series-title").value = state.title || "";
+                    if (document.getElementById("author-name")) document.getElementById("author-name").value = state.author || "";
+                    if (document.getElementById("page-count")) document.getElementById("page-count").value = state.pageCount || 50;
+                    if (document.getElementById("paper-type")) document.getElementById("paper-type").value = state.paperType || "premium-cream";
+
+                    saveStateToStorage();
+                    updateSpineWidth();
+                    renderAll();
+                    
+                    if (overlay) overlay.style.display = "none";
+                    alert(`Projeto "${displayProjName}" carregado com sucesso da nuvem pública!`);
+                })
+                .catch(err => {
+                    console.error("Erro ao baixar do servidor público:", err);
+                    if (overlay) overlay.style.display = "none";
+                    alert(`Erro na sincronização pública: ${err.message}`);
+                });
+            }
         }
     });
 
     function updateCloudProjectsDropdown() {
-        const code = syncCodeInput.value.trim().toUpperCase();
-        if (!code) return;
-
-        selectDropdown.innerHTML = '<option value="">-- Carregando... --</option>';
-
-        fetch(`${BUCKET_URL}/?prefix=${code}_`)
-        .then(response => {
-            if (!response.ok) throw new Error();
-            return response.json();
-        })
-        .then(keys => {
-            selectDropdown.innerHTML = '<option value="">-- Projetos na Nuvem --</option>';
-            if (!keys || keys.length === 0) {
-                const opt = document.createElement("option");
-                opt.value = "";
-                opt.innerText = "Nenhum projeto encontrado";
-                selectDropdown.appendChild(opt);
-                return;
-            }
-            keys.forEach(key => {
-                const projectName = key.substring(code.length + 1).replace(/_/g, " ");
-                const opt = document.createElement("option");
-                opt.value = key;
-                opt.innerText = projectName;
+        const token = localStorage.getItem("kdp_manga_github_token");
+        
+        if (token) {
+            selectDropdown.innerHTML = '<option value="">-- Carregando do GitHub... --</option>';
+            fetch("https://api.github.com/gists", {
+                headers: {
+                    "Authorization": `token ${token}`,
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(gists => {
+                selectDropdown.innerHTML = '<option value="">-- Projetos no GitHub --</option>';
+                const mangaGists = gists.filter(g => g.description && g.description.startsWith("KDP Manga Project:"));
                 
-                const currentName = document.getElementById("project-save-name").value.trim();
-                if (projectName === currentName) {
-                    opt.selected = true;
+                if (mangaGists.length === 0) {
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.innerText = "Nenhum projeto encontrado no GitHub";
+                    selectDropdown.appendChild(opt);
+                    return;
                 }
                 
-                selectDropdown.appendChild(opt);
+                mangaGists.forEach(gist => {
+                    const projectName = gist.description.substring("KDP Manga Project:".length).trim();
+                    const opt = document.createElement("option");
+                    opt.value = gist.id;
+                    opt.innerText = projectName;
+                    
+                    const currentName = document.getElementById("project-save-name").value.trim();
+                    if (projectName === currentName) {
+                        opt.selected = true;
+                    }
+                    selectDropdown.appendChild(opt);
+                });
+            })
+            .catch(err => {
+                console.error("Erro ao listar Gists:", err);
+                selectDropdown.innerHTML = '<option value="">-- Erro ao carregar do GitHub --</option>';
             });
-        })
-        .catch(() => {
-            selectDropdown.innerHTML = '<option value="">-- Erro ao carregar --</option>';
-        });
+        } else {
+            const code = syncCodeInput.value.trim().toUpperCase();
+            if (!code) {
+                selectDropdown.innerHTML = '<option value="">-- Insira um código de sincronização --</option>';
+                return;
+            }
+
+            selectDropdown.innerHTML = '<option value="">-- Carregando da Nuvem... --</option>';
+
+            fetch(`${BUCKET_URL}/?prefix=${code}_`)
+            .then(response => {
+                if (!response.ok) throw new Error();
+                return response.json();
+            })
+            .then(keys => {
+                selectDropdown.innerHTML = '<option value="">-- Projetos na Nuvem Pública --</option>';
+                if (!keys || keys.length === 0) {
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.innerText = "Nenhum projeto encontrado";
+                    selectDropdown.appendChild(opt);
+                    return;
+                }
+                keys.forEach(key => {
+                    const projectName = key.substring(code.length + 1).replace(/_/g, " ");
+                    const opt = document.createElement("option");
+                    opt.value = key;
+                    opt.innerText = projectName;
+                    
+                    const currentName = document.getElementById("project-save-name").value.trim();
+                    if (projectName === currentName) {
+                        opt.selected = true;
+                    }
+                    selectDropdown.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                selectDropdown.innerHTML = '<option value="">-- Erro ou Bucket público expirado --</option>';
+            });
+        }
     }
 }
 
@@ -3092,31 +3290,18 @@ function updateCostTrackerUI() {
 function checkQRShareUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     const blobId = urlParams.get("p");
-    if (!blobId) return;
+    const gistId = urlParams.get("g");
+    
+    if (!blobId && !gistId) return;
 
     const overlay = document.getElementById("cloud-loading-overlay");
     const loadingText = document.getElementById("cloud-loading-text");
     if (overlay) {
-        if (loadingText) loadingText.innerText = "Importando projeto via QR Code...";
+        if (loadingText) loadingText.innerText = "Importando projeto da Nuvem...";
         overlay.style.display = "flex";
     }
 
-    console.log(`Parâmetro de QR Code encontrado. Baixando blob ID: ${blobId}`);
-
-    fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
-    .then(res => {
-        if (!res.ok) throw new Error("Erro no download direto.");
-        return res;
-    })
-    .catch(() => {
-        console.warn("Download direto falhou. Tentando via CORS Proxy...");
-        return fetch(`https://corsproxy.io/?https://jsonblob.com/api/jsonBlob/${blobId}`);
-    })
-    .then(response => {
-        if (!response.ok) throw new Error("Erro ao baixar dados do servidor.");
-        return response.json();
-    })
-    .then(loadedState => {
+    const importSuccess = (loadedState, typeLabel) => {
         state = { ...state, ...loadedState };
         
         // Sync inputs in UI
@@ -3136,13 +3321,43 @@ function checkQRShareUrl() {
         window.history.replaceState({}, document.title, window.location.pathname);
         
         if (overlay) overlay.style.display = "none";
-        alert(`Projeto "${state.title || 'Manga'}" importado via QR Code com sucesso!`);
-    })
-    .catch(err => {
-        console.error("Erro ao importar do QR Code:", err);
+        alert(`Projeto "${state.title || 'Manga'}" importado do ${typeLabel} com sucesso!`);
+    };
+
+    const importError = (err, typeLabel) => {
+        console.error(`Erro ao importar do ${typeLabel}:`, err);
         if (overlay) overlay.style.display = "none";
-        alert(`Falha ao carregar projeto via QR Code: ${err.message}`);
-        // Clear the URL parameter anyway to prevent loop
+        alert(`Falha ao carregar projeto via ${typeLabel}: ${err.message}`);
         window.history.replaceState({}, document.title, window.location.pathname);
-    });
+    };
+
+    if (gistId) {
+        console.log(`Parâmetro de Gist encontrado. Baixando Gist ID: ${gistId}`);
+        downloadFromGitHubGist(gistId, (loadedState) => {
+            importSuccess(loadedState, "GitHub Gist");
+        }, (err) => {
+            importError(err, "GitHub Gist");
+        });
+    } else if (blobId) {
+        console.log(`Parâmetro de QR Code encontrado. Baixando blob ID: ${blobId}`);
+        fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
+        .then(res => {
+            if (!res.ok) throw new Error("Erro no download direto.");
+            return res;
+        })
+        .catch(() => {
+            console.warn("Download direto falhou. Tentando via CORS Proxy...");
+            return fetch(`https://corsproxy.io/?https://jsonblob.com/api/jsonBlob/${blobId}`);
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Erro ao baixar dados do servidor.");
+            return response.json();
+        })
+        .then(loadedState => {
+            importSuccess(loadedState, "Servidor Público (JSONBlob)");
+        })
+        .catch(err => {
+            importError(err, "Servidor Público (JSONBlob)");
+        });
+    }
 }
