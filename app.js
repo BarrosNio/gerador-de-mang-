@@ -78,6 +78,26 @@ document.addEventListener("DOMContentLoaded", () => {
     initCostTracker();
     renderAll();
     checkQRShareUrl(); // Detect QR Code import on page load
+
+    // Register Undo UI button listener
+    const undoBtn = document.getElementById("btn-undo");
+    if (undoBtn) {
+        undoBtn.addEventListener("click", () => {
+            triggerUndo();
+        });
+    }
+
+    // Register global Ctrl + Z shortcut listener
+    window.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+            // Ignore if the user is typing in a form input
+            if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") {
+                return;
+            }
+            e.preventDefault();
+            triggerUndo();
+        }
+    });
 });
 
 // INDEXEDDB UTILITIES FOR LARGE IMAGE STORAGE (BYPASSES LOCALSTORAGE 5MB LIMIT)
@@ -123,6 +143,9 @@ function loadImageFromIDB(key) {
         });
     });
 }
+
+// GLOBAL UNDO STACK (HISTORY TRACKING)
+const undoStack = [];
 
 function saveStateToStorage() {
     // 1. Save all base64 images to IndexedDB first
@@ -178,9 +201,24 @@ function saveStateToStorage() {
         });
     }
 
+    const serialized = JSON.stringify(cleanState);
+
+    // Save state to Undo Stack if it changed
+    if (undoStack.length > 0) {
+        const lastItem = JSON.stringify(undoStack[undoStack.length - 1]);
+        if (lastItem !== serialized) {
+            if (undoStack.length >= 15) {
+                undoStack.shift();
+            }
+            undoStack.push(JSON.parse(serialized));
+        }
+    } else {
+        undoStack.push(JSON.parse(serialized));
+    }
+
     // 3. Save only lightweight JSON to LocalStorage
     try {
-        localStorage.setItem("kdp_manga_creator_state", JSON.stringify(cleanState));
+        localStorage.setItem("kdp_manga_creator_state", serialized);
     } catch (e) {
         console.error("Erro crítico: falha ao salvar estado leve no localStorage:", e);
     }
@@ -1365,6 +1403,64 @@ function renderSpeechBubblesOverlay(page) {
         rotateHandle.className = "bubble-rotate-handle";
         div.appendChild(rotateHandle);
 
+        // Add edit handle inside the bubble (pencil icon)
+        const editHandle = document.createElement("div");
+        editHandle.className = "bubble-edit-handle";
+        editHandle.innerHTML = "✏️";
+        div.appendChild(editHandle);
+
+        // Add delete handle inside the bubble (X close icon)
+        const deleteHandle = document.createElement("div");
+        deleteHandle.className = "bubble-delete-handle";
+        deleteHandle.innerHTML = "&times;";
+        div.appendChild(deleteHandle);
+
+        // Edit and Delete helpers
+        function triggerBubbleEdit() {
+            const newText = prompt("Edite o diálogo do balão (Deixe em branco para deletar):", bubble.text);
+            if (newText === null) return;
+            
+            if (newText.trim() === "") {
+                page.bubbles = page.bubbles.filter(b => b.id !== bubble.id);
+            } else {
+                bubble.text = newText;
+            }
+            saveStateToStorage();
+            renderPageCanvas();
+            renderSpeechBubblesOverlay(page);
+        }
+
+        function triggerBubbleDelete() {
+            if (confirm("Deseja realmente excluir este balão de fala?")) {
+                page.bubbles = page.bubbles.filter(b => b.id !== bubble.id);
+                saveStateToStorage();
+                renderPageCanvas();
+                renderSpeechBubblesOverlay(page);
+            }
+        }
+
+        editHandle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            triggerBubbleEdit();
+        });
+        editHandle.addEventListener("touchstart", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            triggerBubbleEdit();
+        });
+
+        deleteHandle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            triggerBubbleDelete();
+        });
+        deleteHandle.addEventListener("touchstart", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            triggerBubbleDelete();
+        });
+
         let isDragging = false;
         let isRotating = false;
         let startMouseX, startMouseY;
@@ -1426,7 +1522,7 @@ function renderSpeechBubblesOverlay(page) {
 
         // Mouse Drag events
         div.addEventListener("mousedown", (e) => {
-            if (e.target === rotateHandle) return; // Let rotate event handle it
+            if (e.target === rotateHandle || e.target === editHandle || e.target === deleteHandle) return; // Ignore drag if clicking controls
             dragStart(e.clientX, e.clientY);
             e.stopPropagation();
             e.preventDefault();
@@ -1447,6 +1543,7 @@ function renderSpeechBubblesOverlay(page) {
 
         // Touch Drag/Rotate events (Mobile)
         div.addEventListener("touchstart", (e) => {
+            if (e.target === editHandle || e.target === deleteHandle) return; // Let edit/delete click handlers handle it
             const touch = e.touches[0];
             if (e.target === rotateHandle) {
                 rotateStart(touch.clientX, touch.clientY);
@@ -3360,4 +3457,100 @@ function checkQRShareUrl() {
             importError(err, "Servidor Público (JSONBlob)");
         });
     }
+}
+
+// 12. UNDO HISTORY HANDLER (RECOVER ACCIDENTAL ACTIONS)
+function triggerUndo() {
+    if (undoStack.length <= 1) {
+        alert("Nenhuma ação anterior para desfazer!");
+        return;
+    }
+    
+    // Pop current state
+    undoStack.pop();
+    
+    // Retrieve previous state
+    const previousState = undoStack[undoStack.length - 1];
+    
+    // Load overlay during restore
+    const overlay = document.getElementById("cloud-loading-overlay");
+    const loadingText = document.getElementById("cloud-loading-text");
+    if (overlay) {
+        if (loadingText) loadingText.innerText = "Desfazendo última ação...";
+        overlay.style.display = "flex";
+    }
+
+    // Set state
+    state = JSON.parse(JSON.stringify(previousState));
+    
+    // Reload IndexedDB image references
+    const promises = [];
+    if (state.characters) {
+        state.characters.forEach(c => {
+            if (c.avatarImage && c.avatarImage.startsWith("idb:")) {
+                const idbKey = c.avatarImage.substring(4);
+                const p = loadImageFromIDB(idbKey).then(img => {
+                    if (img) c.avatarImage = img;
+                });
+                promises.push(p);
+            }
+        });
+    }
+    if (state.cover && state.cover.artImage && state.cover.artImage.startsWith("idb:")) {
+        const idbKey = state.cover.artImage.substring(4);
+        const p = loadImageFromIDB(idbKey).then(img => {
+            if (img) state.cover.artImage = img;
+        });
+        promises.push(p);
+    }
+    if (state.pages) {
+        state.pages.forEach(p => {
+            if (p.image && p.image.startsWith("idb:")) {
+                const idbKey = p.image.substring(4);
+                const pr = loadImageFromIDB(idbKey).then(img => {
+                    if (img) p.image = img;
+                });
+                promises.push(pr);
+            }
+            if (p.panels) {
+                p.panels.forEach((panel, idx) => {
+                    if (panel.image && panel.image.startsWith("idb:")) {
+                        const idbKey = panel.image.substring(4);
+                        const pr = loadImageFromIDB(idbKey).then(img => {
+                            if (img) panel.image = img;
+                        });
+                        promises.push(pr);
+                    }
+                });
+            }
+        });
+    }
+    
+    Promise.all(promises).then(() => {
+        // Save back to storage
+        try {
+            localStorage.setItem("kdp_manga_creator_state", JSON.stringify(previousState));
+        } catch (e) {
+            console.error(e);
+        }
+        
+        // Re-render UI inputs if they exist
+        const nameInput = document.getElementById("project-save-name");
+        if (nameInput) nameInput.value = state.title || "Meu Projeto";
+        if (document.getElementById("series-title")) document.getElementById("series-title").value = state.title || "";
+        if (document.getElementById("author-name")) document.getElementById("author-name").value = state.author || "";
+        if (document.getElementById("page-count")) document.getElementById("page-count").value = state.pageCount || 50;
+        if (document.getElementById("paper-type")) document.getElementById("paper-type").value = state.paperType || "premium-cream";
+
+        // Refresh UI
+        updateSpineWidth();
+        renderAll();
+        
+        if (overlay) overlay.style.display = "none";
+        alert("Ação desfeita com sucesso!");
+    }).catch(err => {
+        console.error("Erro ao desfazer ação:", err);
+        if (overlay) overlay.style.display = "none";
+        alert("Erro ao desfazer ação: " + err.message);
+    });
 }

@@ -835,6 +835,50 @@ canvas {
     display: block;
 }
 
+.bubble-delete-handle {
+    display: none;
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 20px;
+    height: 20px;
+    background-color: #ef4444;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.bubble-edit-handle {
+    display: none;
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    width: 20px;
+    height: 20px;
+    background-color: #10b981;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 11px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.speech-bubble-item.selected .bubble-delete-handle,
+.speech-bubble-item.selected .bubble-edit-handle {
+    display: flex;
+}
+
 /* MODAL STYLING */
 .modal-overlay {
     position: fixed;
