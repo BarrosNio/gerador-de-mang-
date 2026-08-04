@@ -2697,7 +2697,7 @@ function initCloudSync() {
         updateCloudProjectsDropdown();
     });
 
-    // Upload to Cloud
+    // Upload to Cloud (Hybrid JSONBlob + KVDB.io strategy to support large image payloads)
     syncToBtn.addEventListener("click", () => {
         const projName = document.getElementById("project-save-name").value.trim() || "Meu_Projeto_Manga";
         const formattedProjName = projName.replace(/ /g, "_");
@@ -2713,25 +2713,48 @@ function initCloudSync() {
 
         // First resolve local IndexedDB images so they are actually uploaded
         createExportableStateBundle((bundle) => {
-            syncToBtn.innerText = "Enviando...";
+            syncToBtn.innerText = "Enviando arte (JSONBlob)...";
             
-            fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
+            // 1. Upload the large bundle to JSONBlob (which has huge size limits)
+            fetch("https://jsonblob.com/api/jsonBlob", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 },
                 body: JSON.stringify(bundle)
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Erro na resposta do servidor.");
+            .then(blobResponse => {
+                if (!blobResponse.ok) {
+                    throw new Error("Erro ao criar arquivo de armazenamento na nuvem.");
                 }
-                alert(`Projeto "${projName}" enviado para a nuvem sob o código "${code}"!`);
+                const blobUrl = blobResponse.headers.get("Location");
+                if (!blobUrl) {
+                    throw new Error("Não foi possível obter o endereço do arquivo na nuvem.");
+                }
+                return blobUrl;
+            })
+            .then(blobUrl => {
+                syncToBtn.innerText = "Registrando atalho (KVDB)...";
+                // 2. Save only the small URL pointer in KVDB.io under the sync code
+                return fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ url: blobUrl })
+                });
+            })
+            .then(kvResponse => {
+                if (!kvResponse.ok) {
+                    throw new Error("Erro ao salvar atalho no banco de códigos.");
+                }
+                alert(`Projeto "${projName}" enviado com sucesso para a nuvem sob o código "${code}"!`);
                 updateCloudProjectsDropdown();
             })
             .catch(err => {
                 console.error("Erro no Cloud Sync Upload:", err);
-                alert("Falha ao salvar na nuvem. Verifique sua conexão.");
+                alert(`Falha ao salvar na nuvem: ${err.message}`);
             })
             .finally(() => {
                 syncToBtn.disabled = false;
@@ -2749,10 +2772,26 @@ function initCloudSync() {
         const displayProjName = selectedKey.substring(code.length + 1).replace(/_/g, " ");
 
         if (confirm(`Deseja carregar o projeto "${displayProjName}" da nuvem? Isso substituirá suas modificações atuais não salvas.`)) {
+            
+            // 1. Fetch the pointer JSON from KVDB
             fetch(`${BUCKET_URL}/${selectedKey}`)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error("Erro ao baixar dados do projeto.");
+                    throw new Error("Erro ao baixar atalho do projeto.");
+                }
+                return response.json();
+            })
+            .then(data => {
+                const targetUrl = data.url;
+                if (!targetUrl) {
+                    throw new Error("Atalho inválido ou corrompido.");
+                }
+                // 2. Fetch the actual large state payload from JSONBlob
+                return fetch(targetUrl);
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Erro ao baixar dados completos do projeto.");
                 }
                 return response.json();
             })
