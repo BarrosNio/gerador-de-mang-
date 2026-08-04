@@ -161,6 +161,21 @@
                                 </select>
                             </div>
                         </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <button class="action-btn-secondary" id="btn-export-project-file" style="flex: 1; font-size: 11px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer;">
+                                <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                <span>Exportar Arquivo (.json)</span>
+                            </button>
+                            <button class="action-btn-secondary" id="btn-import-project-file" style="flex: 1; font-size: 11px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer;">
+                                <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                <span>Importar Arquivo (.json)</span>
+                            </button>
+                            <input type="file" id="input-import-project-file" style="display: none;" accept=".json">
+                        </div>
+                        <button class="action-btn-primary" id="btn-qr-sync" style="width: 100%; margin-top: 10px; border-radius: 8px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            <span>Sincronizar no Celular (QR Code)</span>
+                        </button>
                     </div>
 
                     <!-- Card de Sincronização em Nuvem (Multi-device) -->
@@ -602,6 +617,45 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL DE SINCRONIZAÇÃO VIA QR CODE -->
+    <div class="modal-overlay" id="qr-modal">
+        <div class="modal-card" style="max-width: 380px; text-align: center;">
+            <div class="modal-header">
+                <h2>Escaneie para Abrir no Celular</h2>
+                <button class="close-modal-btn" id="btn-close-qr-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 20px 10px;">
+                <p style="font-size: 13px; color: var(--text-secondary);">
+                    Aponte a câmera do seu celular para o QR Code abaixo para abrir o seu mangá com todos os personagens e imagens diretamente no celular!
+                </p>
+                <div id="qr-code-container" style="background: white; padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                    <img id="qr-code-img" src="" alt="QR Code" style="width: 200px; height: 200px; display: block;">
+                </div>
+                <div style="width: 100%;">
+                    <label style="font-size: 11px; color: var(--text-secondary); text-align: left; display: block; margin-bottom: 4px;">Link de Compartilhamento:</label>
+                    <input type="text" id="qr-share-link" readonly style="width: 100%; text-align: center; font-size: 11px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff;">
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="action-btn-secondary" id="btn-close-qr-modal-footer">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TELA DE LOADING DA NUVEM -->
+    <div id="cloud-loading-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100000; align-items: center; justify-content: center; flex-direction: column; gap: 20px; color: white; font-family: 'Outfit', sans-serif;">
+        <div class="spinner" style="width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top: 5px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <div style="font-size: 18px; font-weight: 600; letter-spacing: 0.5px;" id="cloud-loading-text">Baixando projeto da nuvem...</div>
+        <div style="font-size: 12px; color: var(--text-secondary);">Por favor, aguarde alguns instantes.</div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 
     <script src="app.js"></script>
 </body>

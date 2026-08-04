@@ -77,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSpineWidth();
     initCostTracker();
     renderAll();
+    checkQRShareUrl(); // Detect QR Code import on page load
 });
 
 // INDEXEDDB UTILITIES FOR LARGE IMAGE STORAGE (BYPASSES LOCALSTORAGE 5MB LIMIT)
@@ -2602,6 +2603,147 @@ function initProjectManager() {
             }
         }
     }
+
+    // Export Project File listener
+    const exportFileBtn = document.getElementById("btn-export-project-file");
+    const importFileBtn = document.getElementById("btn-import-project-file");
+    const importFileInput = document.getElementById("input-import-project-file");
+
+    if (exportFileBtn) {
+        exportFileBtn.addEventListener("click", () => {
+            const projName = nameInput.value.trim() || "Meu_Projeto_Manga";
+            exportFileBtn.disabled = true;
+            exportFileBtn.innerText = "Exportando...";
+            
+            createExportableStateBundle((bundle) => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bundle, null, 2));
+                const downloadAnchor = document.createElement("a");
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `Projeto_Manga_${projName.replace(/ /g, "_")}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                
+                exportFileBtn.disabled = false;
+                exportFileBtn.innerHTML = `
+                    <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Exportar Arquivo (.json)</span>
+                `;
+            });
+        });
+    }
+
+    if (importFileBtn && importFileInput) {
+        importFileBtn.addEventListener("click", () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const loadedState = JSON.parse(event.target.result);
+                        if (!loadedState.pages && !loadedState.characters) {
+                            throw new Error("O arquivo selecionado não parece ser um projeto válido do Manga Creator.");
+                        }
+                        
+                        state = { ...state, ...loadedState };
+                        
+                        // Sync inputs
+                        const projName = file.name.replace("Projeto_Manga_", "").replace(".json", "").replace(/_/g, " ");
+                        nameInput.value = projName;
+                        if (document.getElementById("series-title")) document.getElementById("series-title").value = state.title || "";
+                        if (document.getElementById("author-name")) document.getElementById("author-name").value = state.author || "";
+                        if (document.getElementById("page-count")) document.getElementById("page-count").value = state.pageCount || 50;
+                        if (document.getElementById("paper-type")) document.getElementById("paper-type").value = state.paperType || "premium-cream";
+
+                        // Save to IndexedDB and LocalStorage automatically
+                        saveStateToStorage();
+                        updateSpineWidth();
+                        renderAll();
+                        
+                        alert(`Projeto "${projName}" importado com sucesso do arquivo!`);
+                    } catch (err) {
+                        console.error("Erro ao importar arquivo do projeto:", err);
+                        alert(`Falha ao importar: ${err.message}`);
+                    }
+                };
+                reader.readAsText(file);
+                importFileInput.value = ""; // Reset
+            }
+        });
+    }
+
+    // QR Sync Event Listener
+    const qrSyncBtn = document.getElementById("btn-qr-sync");
+    const qrModal = document.getElementById("qr-modal");
+    const qrCloseBtn = document.getElementById("btn-close-qr-modal");
+    const qrCloseFooterBtn = document.getElementById("btn-close-qr-modal-footer");
+    const qrImg = document.getElementById("qr-code-img");
+    const qrLinkInput = document.getElementById("qr-share-link");
+
+    if (qrSyncBtn) {
+        qrSyncBtn.addEventListener("click", () => {
+            qrSyncBtn.disabled = true;
+            qrSyncBtn.innerText = "Preparando QR Code...";
+
+            createExportableStateBundle((bundle) => {
+                // Post full project state to JSONBlob
+                fetch("https://jsonblob.com/api/jsonBlob", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify(bundle)
+                })
+                .then(blobResponse => {
+                    if (!blobResponse.ok) throw new Error("Erro ao criar link de compartilhamento.");
+                    const blobUrl = blobResponse.headers.get("Location");
+                    if (!blobUrl) throw new Error("Erro na resposta do servidor.");
+                    return blobUrl;
+                })
+                .then(blobUrl => {
+                    const blobId = blobUrl.split("/").pop();
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?p=${blobId}`;
+                    
+                    // Generate QR code using public free API
+                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+                    
+                    qrImg.src = qrApiUrl;
+                    qrLinkInput.value = shareUrl;
+                    
+                    // Open modal
+                    if (qrModal) qrModal.style.display = "flex";
+                })
+                .catch(err => {
+                    console.error("Erro ao gerar QR Code:", err);
+                    alert(`Não foi possível sincronizar no momento: ${err.message}`);
+                })
+                .finally(() => {
+                    qrSyncBtn.disabled = false;
+                    qrSyncBtn.innerHTML = `
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span>Sincronizar no Celular (QR Code)</span>
+                    `;
+                });
+            });
+        });
+    }
+
+    // Modal close listeners
+    if (qrCloseBtn) {
+        qrCloseBtn.addEventListener("click", () => {
+            if (qrModal) qrModal.style.display = "none";
+        });
+    }
+    if (qrCloseFooterBtn) {
+        qrCloseFooterBtn.addEventListener("click", () => {
+            if (qrModal) qrModal.style.display = "none";
+        });
+    }
 }
 
 // HELPER TO GENERATE FULL PORTABLE STATE WITH BASE64 IMAGES INCLUDED
@@ -2921,4 +3063,55 @@ function updateCostTrackerUI() {
     statsCost.innerText = `$${totalCost.toFixed(4)} USD`;
     statsRemaining.innerText = `$${remaining.toFixed(4)} USD`;
     costBar.style.width = `${pct}%`;
+}
+
+// 11. QR SHARE URL PROCESSOR (AUTO-IMPORT FROM URL PARAMETER)
+function checkQRShareUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const blobId = urlParams.get("p");
+    if (!blobId) return;
+
+    const overlay = document.getElementById("cloud-loading-overlay");
+    const loadingText = document.getElementById("cloud-loading-text");
+    if (overlay) {
+        if (loadingText) loadingText.innerText = "Importando projeto via QR Code...";
+        overlay.style.display = "flex";
+    }
+
+    console.log(`Parâmetro de QR Code encontrado. Baixando blob ID: ${blobId}`);
+
+    fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
+    .then(response => {
+        if (!response.ok) throw new Error("Erro ao baixar dados do servidor.");
+        return response.json();
+    })
+    .then(loadedState => {
+        state = { ...state, ...loadedState };
+        
+        // Sync inputs in UI
+        const nameInput = document.getElementById("project-save-name");
+        if (nameInput) nameInput.value = state.title || "Meu Projeto";
+        if (document.getElementById("series-title")) document.getElementById("series-title").value = state.title || "";
+        if (document.getElementById("author-name")) document.getElementById("author-name").value = state.author || "";
+        if (document.getElementById("page-count")) document.getElementById("page-count").value = state.pageCount || 50;
+        if (document.getElementById("paper-type")) document.getElementById("paper-type").value = state.paperType || "premium-cream";
+
+        // Save to IndexedDB and LocalStorage on the new device
+        saveStateToStorage();
+        updateSpineWidth();
+        renderAll();
+
+        // Clear the URL parameter so refresh doesn't overwrite new modifications
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        if (overlay) overlay.style.display = "none";
+        alert(`Projeto "${state.title || 'Manga'}" importado via QR Code com sucesso!`);
+    })
+    .catch(err => {
+        console.error("Erro ao importar do QR Code:", err);
+        if (overlay) overlay.style.display = "none";
+        alert(`Falha ao carregar projeto via QR Code: ${err.message}`);
+        // Clear the URL parameter anyway to prevent loop
+        window.history.replaceState({}, document.title, window.location.pathname);
+    });
 }
