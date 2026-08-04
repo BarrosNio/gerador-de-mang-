@@ -2506,12 +2506,45 @@ function initProjectManager() {
             return;
         }
 
-        // Save current state with prefix
-        const projectKey = `kdp_manga_project_${projName}`;
-        localStorage.setItem(projectKey, JSON.stringify(state));
-        
-        alert(`Projeto "${projName}" salvo com sucesso no navegador!`);
-        updateSavedProjectsDropdown();
+        // First call autosave to store new images into IndexedDB
+        saveStateToStorage();
+
+        // Create clean state clone with image data replaced by pointer strings to avoid QuotaExceededError
+        const cleanProjectState = JSON.parse(JSON.stringify(state));
+        if (cleanProjectState.characters) {
+            cleanProjectState.characters.forEach(c => {
+                if (c.avatarImage && c.avatarImage.startsWith("data:image")) {
+                    c.avatarImage = "idb:char_" + c.id;
+                }
+            });
+        }
+        if (cleanProjectState.cover && cleanProjectState.cover.artImage && cleanProjectState.cover.artImage.startsWith("data:image")) {
+            cleanProjectState.cover.artImage = "idb:cover_art";
+        }
+        if (cleanProjectState.pages) {
+            cleanProjectState.pages.forEach(p => {
+                if (p.image && p.image.startsWith("data:image")) {
+                    p.image = "idb:page_" + p.id;
+                }
+                if (p.panels) {
+                    p.panels.forEach((panel, idx) => {
+                        if (panel.image && panel.image.startsWith("data:image")) {
+                            panel.image = `idb:panel_${p.id}_${idx}`;
+                        }
+                    });
+                }
+            });
+        }
+
+        try {
+            const projectKey = `kdp_manga_project_${projName}`;
+            localStorage.setItem(projectKey, JSON.stringify(cleanProjectState));
+            alert(`Projeto "${projName}" salvo com sucesso no navegador!`);
+            updateSavedProjectsDropdown();
+        } catch (e) {
+            console.error("Erro ao salvar projeto localmente:", e);
+            alert("Erro: Não foi possível salvar o projeto no navegador devido ao limite de espaço. Exclua projetos antigos ou use o botão de Salvar na Nuvem.");
+        }
     });
 
     // Dropdown selection change listener
