@@ -857,6 +857,7 @@ canvas {
     border-radius: 16px;
     width: 500px;
     max-width: 100%;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
@@ -892,6 +893,7 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    overflow-y: auto;
 }
 
 .modal-desc {
