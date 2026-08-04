@@ -2690,17 +2690,31 @@ function initProjectManager() {
             qrSyncBtn.innerText = "Preparando QR Code...";
 
             createExportableStateBundle((bundle) => {
-                // Post full project state to ExtendsClass JSON storage
+                // Post full project state to ExtendsClass JSON storage using text/plain to bypass preflight CORS
                 fetch("https://extendsclass.com/api/json-storage/bin", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "text/plain"
                     },
                     body: JSON.stringify(bundle)
                 })
                 .then(res => {
-                    if (!res.ok) throw new Error("Servidor ExtendsClass retornou erro.");
+                    if (!res.ok) throw new Error("Erro direto do servidor ExtendsClass.");
                     return res.json();
+                })
+                .catch(err => {
+                    console.warn("Upload direto para ExtendsClass falhou. Tentando via CORS Proxy...", err);
+                    return fetch("https://corsproxy.io/?https://extendsclass.com/api/json-storage/bin", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "text/plain"
+                        },
+                        body: JSON.stringify(bundle)
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error("CORS Proxy ExtendsClass retornou erro.");
+                        return res.json();
+                    });
                 })
                 .then(data => {
                     if (!data.id) throw new Error("ID de compartilhamento não retornado.");
