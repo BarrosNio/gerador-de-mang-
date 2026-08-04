@@ -2690,8 +2690,8 @@ function initProjectManager() {
             qrSyncBtn.innerText = "Preparando QR Code...";
 
             createExportableStateBundle((bundle) => {
-                // Post full project state to ExtendsClass JSON storage using text/plain to bypass preflight CORS
-                fetch("https://extendsclass.com/api/json-storage/bin", {
+                // Post full project state to JSONBlob using text/plain to bypass CORS preflight
+                fetch("https://jsonblob.com/api/jsonBlob", {
                     method: "POST",
                     headers: {
                         "Content-Type": "text/plain"
@@ -2699,12 +2699,15 @@ function initProjectManager() {
                     body: JSON.stringify(bundle)
                 })
                 .then(res => {
-                    if (!res.ok) throw new Error("Erro direto do servidor ExtendsClass.");
-                    return res.json();
+                    if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
+                    if (!res.ok) throw new Error("Servidor de compartilhamento retornou erro.");
+                    const blobUrl = res.headers.get("Location");
+                    if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento.");
+                    return { id: blobUrl.split("/").pop() };
                 })
                 .catch(err => {
-                    console.warn("Upload direto para ExtendsClass falhou. Tentando via CORS Proxy...", err);
-                    return fetch("https://corsproxy.io/?https://extendsclass.com/api/json-storage/bin", {
+                    console.warn("Upload direto falhou. Tentando via CORS Proxy...", err);
+                    return fetch("https://corsproxy.io/?https://jsonblob.com/api/jsonBlob", {
                         method: "POST",
                         headers: {
                             "Content-Type": "text/plain"
@@ -2712,8 +2715,11 @@ function initProjectManager() {
                         body: JSON.stringify(bundle)
                     })
                     .then(res => {
-                        if (!res.ok) throw new Error("CORS Proxy ExtendsClass retornou erro.");
-                        return res.json();
+                        if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
+                        if (!res.ok) throw new Error("CORS Proxy retornou erro.");
+                        const blobUrl = res.headers.get("Location");
+                        if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento via Proxy.");
+                        return { id: blobUrl.split("/").pop() };
                     });
                 })
                 .then(data => {
@@ -3092,7 +3098,15 @@ function checkQRShareUrl() {
 
     console.log(`Parâmetro de QR Code encontrado. Baixando blob ID: ${blobId}`);
 
-    fetch(`https://extendsclass.com/api/json-storage/bin/${blobId}`)
+    fetch(`https://jsonblob.com/api/jsonBlob/${blobId}`)
+    .then(res => {
+        if (!res.ok) throw new Error("Erro no download direto.");
+        return res;
+    })
+    .catch(() => {
+        console.warn("Download direto falhou. Tentando via CORS Proxy...");
+        return fetch(`https://corsproxy.io/?https://jsonblob.com/api/jsonBlob/${blobId}`);
+    })
     .then(response => {
         if (!response.ok) throw new Error("Erro ao baixar dados do servidor.");
         return response.json();
