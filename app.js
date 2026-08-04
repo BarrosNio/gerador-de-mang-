@@ -2690,41 +2690,8 @@ function initProjectManager() {
             qrSyncBtn.innerText = "Preparando QR Code...";
 
             createExportableStateBundle((bundle) => {
-                // Post full project state to JSONBlob using text/plain to bypass CORS preflight
-                fetch("https://jsonblob.com/api/jsonBlob", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify(bundle)
-                })
-                .then(res => {
-                    if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
-                    if (!res.ok) throw new Error("Servidor de compartilhamento retornou erro.");
-                    const blobUrl = res.headers.get("Location");
-                    if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento.");
-                    return { id: blobUrl.split("/").pop() };
-                })
-                .catch(err => {
-                    console.warn("Upload direto falhou. Tentando via CORS Proxy...", err);
-                    return fetch("https://corsproxy.io/?https://jsonblob.com/api/jsonBlob", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "text/plain"
-                        },
-                        body: JSON.stringify(bundle)
-                    })
-                    .then(res => {
-                        if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
-                        if (!res.ok) throw new Error("CORS Proxy retornou erro.");
-                        const blobUrl = res.headers.get("Location");
-                        if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento via Proxy.");
-                        return { id: blobUrl.split("/").pop() };
-                    });
-                })
-                .then(data => {
-                    if (!data.id) throw new Error("ID de compartilhamento não retornado.");
-                    const blobId = data.id;
+                uploadToJSONBlob(bundle, (blobUrl) => {
+                    const blobId = blobUrl.split("/").pop();
                     const shareUrl = `${window.location.origin}${window.location.pathname}?p=${blobId}`;
                     
                     // Generate QR code using public free API
@@ -2735,12 +2702,15 @@ function initProjectManager() {
                     
                     // Open modal
                     if (qrModal) qrModal.style.display = "flex";
-                })
-                .catch(err => {
+                    
+                    qrSyncBtn.disabled = false;
+                    qrSyncBtn.innerHTML = `
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span>Sincronizar no Celular (QR Code)</span>
+                    `;
+                }, (err) => {
                     console.error("Erro ao gerar QR Code:", err);
                     alert(`Não foi possível sincronizar no momento: ${err.message}`);
-                })
-                .finally(() => {
                     qrSyncBtn.disabled = false;
                     qrSyncBtn.innerHTML = `
                         <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -2818,6 +2788,57 @@ function createExportableStateBundle(callback) {
     });
 }
 
+// HELPER TO UPLOAD BUNDLE TO JSONBLOB WITH CORS PREFLIGHT BYPASS AND CORS PROXY FALLBACK
+function uploadToJSONBlob(bundle, onSuccess, onError) {
+    // 1. Try direct upload with simple text/plain header to bypass preflight OPTIONS check
+    fetch("https://jsonblob.com/api/jsonBlob", {
+        method: "POST",
+        headers: {
+            "Content-Type": "text/plain"
+        },
+        body: JSON.stringify(bundle)
+    })
+    .then(res => {
+        if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
+        if (!res.ok) throw new Error("Servidor de compartilhamento retornou erro.");
+        const blobUrl = res.headers.get("Location");
+        if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento.");
+        return blobUrl;
+    })
+    .then(blobUrl => {
+        onSuccess(blobUrl);
+    })
+    .catch(err => {
+        console.warn("Upload direto falhou. Tentando via CORS Proxy...", err);
+        if (err.message && err.message.includes("429")) {
+            // If it's a rate limit error, propagate it directly without wasting time on proxy
+            onError(err);
+            return;
+        }
+        
+        fetch("https://corsproxy.io/?https://jsonblob.com/api/jsonBlob", {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify(bundle)
+        })
+        .then(res => {
+            if (res.status === 429) throw new Error("Limite de envios excedido (429). Aguarde 5 minutos e tente novamente.");
+            if (!res.ok) throw new Error("CORS Proxy retornou erro.");
+            const blobUrl = res.headers.get("Location");
+            if (!blobUrl) throw new Error("Não foi possível obter o endereço de compartilhamento via Proxy.");
+            return blobUrl;
+        })
+        .then(blobUrl => {
+            onSuccess(blobUrl);
+        })
+        .catch(proxyErr => {
+            onError(proxyErr);
+        });
+    });
+}
+
 // 9. CLOUD SYNC MANAGER (CROSS-DEVICE SYNC)
 function initCloudSync() {
     const syncCodeInput = document.getElementById("project-sync-code");
@@ -2873,50 +2894,34 @@ function initCloudSync() {
 
         // First resolve local IndexedDB images so they are actually uploaded
         createExportableStateBundle((bundle) => {
-            syncToBtn.innerText = "Enviando arte (JSONBlob)...";
-            
-            // 1. Upload the large bundle to JSONBlob (which has huge size limits)
-            fetch("https://jsonblob.com/api/jsonBlob", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                body: JSON.stringify(bundle)
-            })
-            .then(blobResponse => {
-                if (!blobResponse.ok) {
-                    throw new Error("Erro ao criar arquivo de armazenamento na nuvem.");
-                }
-                const blobUrl = blobResponse.headers.get("Location");
-                if (!blobUrl) {
-                    throw new Error("Não foi possível obter o endereço do arquivo na nuvem.");
-                }
-                return blobUrl;
-            })
-            .then(blobUrl => {
+            uploadToJSONBlob(bundle, (blobUrl) => {
                 syncToBtn.innerText = "Registrando atalho (KVDB)...";
                 // 2. Save only the small URL pointer in KVDB.io under the sync code
-                return fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
+                fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({ url: blobUrl })
+                })
+                .then(kvResponse => {
+                    if (!kvResponse.ok) {
+                        throw new Error("Erro ao salvar atalho no banco de códigos.");
+                    }
+                    alert(`Projeto "${projName}" enviado com sucesso para a nuvem sob o código "${code}"!`);
+                    updateCloudProjectsDropdown();
+                })
+                .catch(err => {
+                    console.error("Erro no Cloud Sync Upload:", err);
+                    alert(`Falha ao salvar na nuvem: ${err.message}`);
+                })
+                .finally(() => {
+                    syncToBtn.disabled = false;
+                    syncToBtn.innerText = "Salvar na Nuvem";
                 });
-            })
-            .then(kvResponse => {
-                if (!kvResponse.ok) {
-                    throw new Error("Erro ao salvar atalho no banco de códigos.");
-                }
-                alert(`Projeto "${projName}" enviado com sucesso para a nuvem sob o código "${code}"!`);
-                updateCloudProjectsDropdown();
-            })
-            .catch(err => {
-                console.error("Erro no Cloud Sync Upload:", err);
+            }, (err) => {
+                console.error("Erro no Cloud Sync Upload (JSONBlob):", err);
                 alert(`Falha ao salvar na nuvem: ${err.message}`);
-            })
-            .finally(() => {
                 syncToBtn.disabled = false;
                 syncToBtn.innerText = "Salvar na Nuvem";
             });
