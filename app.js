@@ -2571,6 +2571,60 @@ function initProjectManager() {
     }
 }
 
+// HELPER TO GENERATE FULL PORTABLE STATE WITH BASE64 IMAGES INCLUDED
+function createExportableStateBundle(callback) {
+    const bundle = JSON.parse(JSON.stringify(state));
+    const promises = [];
+    
+    if (bundle.characters) {
+        bundle.characters.forEach(c => {
+            if (c.avatarImage && c.avatarImage.startsWith("idb:")) {
+                const idbKey = c.avatarImage.substring(4);
+                const p = loadImageFromIDB(idbKey).then(img => {
+                    if (img) c.avatarImage = img;
+                });
+                promises.push(p);
+            }
+        });
+    }
+    if (bundle.cover && bundle.cover.artImage && bundle.cover.artImage.startsWith("idb:")) {
+        const idbKey = bundle.cover.artImage.substring(4);
+        const p = loadImageFromIDB(idbKey).then(img => {
+            if (img) bundle.cover.artImage = img;
+        });
+        promises.push(p);
+    }
+    if (bundle.pages) {
+        bundle.pages.forEach(p => {
+            if (p.image && p.image.startsWith("idb:")) {
+                const idbKey = p.image.substring(4);
+                const pr = loadImageFromIDB(idbKey).then(img => {
+                    if (img) p.image = img;
+                });
+                promises.push(pr);
+            }
+            if (p.panels) {
+                p.panels.forEach((panel, idx) => {
+                    if (panel.image && panel.image.startsWith("idb:")) {
+                        const idbKey = panel.image.substring(4);
+                        const pr = loadImageFromIDB(idbKey).then(img => {
+                            if (img) panel.image = img;
+                        });
+                        promises.push(pr);
+                    }
+                });
+            }
+        });
+    }
+    
+    Promise.all(promises).then(() => {
+        callback(bundle);
+    }).catch(err => {
+        console.error("Erro ao gerar bundle com IndexedDB:", err);
+        callback(bundle); // fallback
+    });
+}
+
 // 9. CLOUD SYNC MANAGER (CROSS-DEVICE SYNC)
 function initCloudSync() {
     const syncCodeInput = document.getElementById("project-sync-code");
@@ -2622,29 +2676,34 @@ function initCloudSync() {
         }
 
         syncToBtn.disabled = true;
-        syncToBtn.innerText = "Enviando...";
+        syncToBtn.innerText = "Preparando dados...";
 
-        fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
-            method: "POST", // POST / PUT saves value in kvdb.io
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(state)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("Erro na resposta do servidor.");
-            }
-            alert(`Projeto "${projName}" enviado para a nuvem sob o código "${code}"!`);
-            updateCloudProjectsDropdown();
-        })
-        .catch(err => {
-            console.error("Erro no Cloud Sync Upload:", err);
-            alert("Falha ao salvar na nuvem. Verifique sua conexão.");
-        })
-        .finally(() => {
-            syncToBtn.disabled = false;
-            syncToBtn.innerText = "Salvar na Nuvem";
+        // First resolve local IndexedDB images so they are actually uploaded
+        createExportableStateBundle((bundle) => {
+            syncToBtn.innerText = "Enviando...";
+            
+            fetch(`${BUCKET_URL}/${code}_${formattedProjName}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(bundle)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Erro na resposta do servidor.");
+                }
+                alert(`Projeto "${projName}" enviado para a nuvem sob o código "${code}"!`);
+                updateCloudProjectsDropdown();
+            })
+            .catch(err => {
+                console.error("Erro no Cloud Sync Upload:", err);
+                alert("Falha ao salvar na nuvem. Verifique sua conexão.");
+            })
+            .finally(() => {
+                syncToBtn.disabled = false;
+                syncToBtn.innerText = "Salvar na Nuvem";
+            });
         });
     });
 
