@@ -668,6 +668,37 @@
         }
     </style>
 
+    <!-- MODAL DE EDIÇÃO DE BALÃO DE FALA -->
+    <div class="modal-overlay" id="bubble-edit-modal">
+        <div class="modal-card" style="max-width: 380px;">
+            <div class="modal-header">
+                <h2>Editar Balão de Fala</h2>
+                <button class="close-modal-btn" id="btn-close-bubble-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; padding: 20px;">
+                <div class="form-group">
+                    <label for="bubble-text-input" style="font-weight: 500; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block;">Texto do Balão</label>
+                    <textarea id="bubble-text-input" rows="4" placeholder="Digite a fala ou pensamento do personagem..." style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.2); color: #fff; padding: 10px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="bubble-type-select" style="font-weight: 500; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block;">Estilo do Balão</label>
+                    <div class="select-wrapper" style="width: 100%; box-sizing: border-box;">
+                        <select id="bubble-type-select" style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: #2a2a2a; color: #fff; padding: 8px 12px; font-size: 13px; cursor: pointer; box-sizing: border-box;">
+                            <option value="normal">Balão Normal (Oval)</option>
+                            <option value="cloud">Nuvem (Pensamento/Sonho)</option>
+                            <option value="rect">Retangular (Narração/Foco)</option>
+                            <option value="shout">Grito (Jagged/Explosão)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color);">
+                <button class="action-btn-secondary" id="btn-cancel-bubble-modal" style="border-radius: 8px; padding: 8px 16px;">Cancelar</button>
+                <button class="action-btn-primary" id="btn-save-bubble-modal" style="border-radius: 8px; padding: 8px 16px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">Salvar Balão</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

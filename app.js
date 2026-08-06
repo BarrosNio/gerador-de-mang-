@@ -78,6 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initCostTracker();
     renderAll();
     checkQRShareUrl(); // Detect QR Code import on page load
+    initBubbleEditModal(); // Initialize custom speech bubble editor modal
 
     // Register Undo UI button listener
     const undoBtn = document.getElementById("btn-undo");
@@ -915,14 +916,20 @@ function initInteriorPages() {
         addBubbleBtn.addEventListener("click", () => {
             const activePage = state.pages.find(p => p.id === state.activePageId);
             if (activePage) {
+                if (!activePage.bubbles) activePage.bubbles = [];
                 activePage.bubbles.push({
                     id: `b-${Date.now()}`,
                     text: "DIÁLOGO...",
                     x: 40,
-                    y: 40
+                    y: 40,
+                    type: "normal",
+                    width: 120,
+                    height: 80,
+                    rotation: 0
                 });
                 saveStateToStorage();
                 renderPageCanvas();
+                renderSpeechBubblesOverlay(activePage);
             }
         });
     }
@@ -1393,6 +1400,24 @@ function renderSpeechBubblesOverlay(page) {
         div.style.left = `${bubble.x}%`;
         div.style.top = `${bubble.y}%`;
         
+        // Apply custom bubble styling type
+        const bubbleType = bubble.type || "normal";
+        div.classList.add(`type-${bubbleType}`);
+
+        // Apply saved width and height (resizing)
+        if (bubble.width) {
+            div.style.width = `${bubble.width}px`;
+        } else {
+            div.style.width = "120px"; // default width
+            bubble.width = 120;
+        }
+        if (bubble.height) {
+            div.style.height = `${bubble.height}px`;
+        } else {
+            div.style.height = "80px"; // default height
+            bubble.height = 80;
+        }
+
         // Apply saved rotation if present
         if (bubble.rotation) {
             div.style.transform = `rotate(${bubble.rotation}deg)`;
@@ -1402,6 +1427,11 @@ function renderSpeechBubblesOverlay(page) {
         const rotateHandle = document.createElement("div");
         rotateHandle.className = "bubble-rotate-handle";
         div.appendChild(rotateHandle);
+
+        // Add resize handle inside the bubble
+        const resizeHandle = document.createElement("div");
+        resizeHandle.className = "bubble-resize-handle";
+        div.appendChild(resizeHandle);
 
         // Add edit handle inside the bubble (pencil icon)
         const editHandle = document.createElement("div");
@@ -1417,17 +1447,7 @@ function renderSpeechBubblesOverlay(page) {
 
         // Edit and Delete helpers
         function triggerBubbleEdit() {
-            const newText = prompt("Edite o diálogo do balão (Deixe em branco para deletar):", bubble.text);
-            if (newText === null) return;
-            
-            if (newText.trim() === "") {
-                page.bubbles = page.bubbles.filter(b => b.id !== bubble.id);
-            } else {
-                bubble.text = newText;
-            }
-            saveStateToStorage();
-            renderPageCanvas();
-            renderSpeechBubblesOverlay(page);
+            openBubbleEditModal(bubble, page);
         }
 
         function triggerBubbleDelete() {
@@ -1463,8 +1483,10 @@ function renderSpeechBubblesOverlay(page) {
 
         let isDragging = false;
         let isRotating = false;
+        let isResizing = false;
         let startMouseX, startMouseY;
         let startBubbleX, startBubbleY;
+        let startWidth, startHeight;
         let bubbleCenterX, bubbleCenterY;
 
         function dragStart(clientX, clientY) {
@@ -1482,6 +1504,17 @@ function renderSpeechBubblesOverlay(page) {
             const rect = div.getBoundingClientRect();
             bubbleCenterX = rect.left + rect.width / 2;
             bubbleCenterY = rect.top + rect.height / 2;
+            document.querySelectorAll(".speech-bubble-item").forEach(b => b.classList.remove("selected"));
+            div.classList.add("selected");
+        }
+
+        function resizeStart(clientX, clientY) {
+            isResizing = true;
+            startMouseX = clientX;
+            startMouseY = clientY;
+            const rect = div.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
             document.querySelectorAll(".speech-bubble-item").forEach(b => b.classList.remove("selected"));
             div.classList.add("selected");
         }
@@ -1505,24 +1538,34 @@ function renderSpeechBubblesOverlay(page) {
             } else if (isRotating) {
                 const angleRad = Math.atan2(clientY - bubbleCenterY, clientX - bubbleCenterX);
                 let angleDeg = angleRad * (180 / Math.PI);
-                // Adjust by 90 degrees since handle is on top
                 angleDeg = (angleDeg + 90) % 360;
                 bubble.rotation = parseFloat(angleDeg.toFixed(1));
                 div.style.transform = `rotate(${bubble.rotation}deg)`;
+            } else if (isResizing) {
+                const deltaX = clientX - startMouseX;
+                const deltaY = clientY - startMouseY;
+                
+                // Set bounds for speech bubble scaling (min 60x30 px)
+                bubble.width = parseFloat(Math.max(60, startWidth + deltaX).toFixed(1));
+                bubble.height = parseFloat(Math.max(30, startHeight + deltaY).toFixed(1));
+                
+                div.style.width = `${bubble.width}px`;
+                div.style.height = `${bubble.height}px`;
             }
         }
 
         function handleEnd() {
-            if (isDragging || isRotating) {
+            if (isDragging || isRotating || isResizing) {
                 isDragging = false;
                 isRotating = false;
+                isResizing = false;
                 saveStateToStorage();
             }
         }
 
         // Mouse Drag events
         div.addEventListener("mousedown", (e) => {
-            if (e.target === rotateHandle || e.target === editHandle || e.target === deleteHandle) return; // Ignore drag if clicking controls
+            if (e.target === rotateHandle || e.target === editHandle || e.target === deleteHandle || e.target === resizeHandle) return;
             dragStart(e.clientX, e.clientY);
             e.stopPropagation();
             e.preventDefault();
@@ -1535,18 +1578,27 @@ function renderSpeechBubblesOverlay(page) {
             e.preventDefault();
         });
 
+        // Mouse Resize events
+        resizeHandle.addEventListener("mousedown", (e) => {
+            resizeStart(e.clientX, e.clientY);
+            e.stopPropagation();
+            e.preventDefault();
+        });
+
         document.addEventListener("mousemove", (e) => {
             handleMove(e.clientX, e.clientY);
         });
 
         document.addEventListener("mouseup", handleEnd);
 
-        // Touch Drag/Rotate events (Mobile)
+        // Touch Drag/Rotate/Resize events (Mobile)
         div.addEventListener("touchstart", (e) => {
-            if (e.target === editHandle || e.target === deleteHandle) return; // Let edit/delete click handlers handle it
+            if (e.target === editHandle || e.target === deleteHandle) return;
             const touch = e.touches[0];
             if (e.target === rotateHandle) {
                 rotateStart(touch.clientX, touch.clientY);
+            } else if (e.target === resizeHandle) {
+                resizeStart(touch.clientX, touch.clientY);
             } else {
                 dragStart(touch.clientX, touch.clientY);
             }
@@ -1554,7 +1606,7 @@ function renderSpeechBubblesOverlay(page) {
         }, { passive: true });
 
         document.addEventListener("touchmove", (e) => {
-            if (isDragging || isRotating) {
+            if (isDragging || isRotating || isResizing) {
                 const touch = e.touches[0];
                 handleMove(touch.clientX, touch.clientY);
             }
@@ -1562,22 +1614,79 @@ function renderSpeechBubblesOverlay(page) {
 
         document.addEventListener("touchend", handleEnd);
 
-        // Double click to edit dialog content or delete
+        // Double click to edit dialog content
         div.addEventListener("dblclick", () => {
-            const newText = prompt("Edite o diálogo do balão (Deixe em branco para deletar):", bubble.text);
-            if (newText === null) return;
-            
-            if (newText.trim() === "") {
-                page.bubbles = page.bubbles.filter(b => b.id !== bubble.id);
-            } else {
-                bubble.text = newText;
-            }
-            saveStateToStorage();
-            renderPageCanvas();
+            triggerBubbleEdit();
         });
 
         overlay.appendChild(div);
     });
+}
+
+// BUBBLE EDIT MODAL CONTROLLER
+let activeBubbleToEdit = null;
+let activePageForBubble = null;
+
+function initBubbleEditModal() {
+    const modal = document.getElementById("bubble-edit-modal");
+    const closeBtn = document.getElementById("btn-close-bubble-modal");
+    const cancelBtn = document.getElementById("btn-cancel-bubble-modal");
+    const saveBtn = document.getElementById("btn-save-bubble-modal");
+    const textInput = document.getElementById("bubble-text-input");
+    const typeSelect = document.getElementById("bubble-type-select");
+
+    if (!modal || !saveBtn) return;
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+        activeBubbleToEdit = null;
+        activePageForBubble = null;
+    };
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            closeModal();
+        });
+    }
+    if (cancelBtn) {
+        cancelBtn.addEventListener("click", () => {
+            closeModal();
+        });
+    }
+
+    saveBtn.addEventListener("click", () => {
+        if (!activeBubbleToEdit || !activePageForBubble) return;
+        const newText = textInput.value.trim();
+        const selectedType = typeSelect.value;
+
+        if (newText === "") {
+            // Delete bubble
+            activePageForBubble.bubbles = activePageForBubble.bubbles.filter(b => b.id !== activeBubbleToEdit.id);
+        } else {
+            activeBubbleToEdit.text = newText;
+            activeBubbleToEdit.type = selectedType;
+        }
+
+        saveStateToStorage();
+        renderPageCanvas();
+        renderSpeechBubblesOverlay(activePageForBubble);
+        closeModal();
+    });
+}
+
+function openBubbleEditModal(bubble, page) {
+    activeBubbleToEdit = bubble;
+    activePageForBubble = page;
+
+    const modal = document.getElementById("bubble-edit-modal");
+    const textInput = document.getElementById("bubble-text-input");
+    const typeSelect = document.getElementById("bubble-type-select");
+
+    if (modal && textInput && typeSelect) {
+        textInput.value = bubble.text || "";
+        typeSelect.value = bubble.type || "normal";
+        modal.classList.add("active");
+    }
 }
 
 // 5. API CONFIGURATION MODAL

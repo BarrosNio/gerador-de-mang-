@@ -879,6 +879,77 @@ canvas {
     display: flex;
 }
 
+.bubble-resize-handle {
+    display: none;
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    width: 12px;
+    height: 12px;
+    background-color: #3b82f6;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    cursor: nwse-resize;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.speech-bubble-item.selected .bubble-resize-handle {
+    display: block;
+}
+
+/* CUSTOM SVG BUBBLE STYLES (MATCHES MANGA STYLES EXACTLY) */
+.speech-bubble-item.type-normal {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><ellipse cx="50" cy="26" rx="47" ry="22" fill="white" stroke="black" stroke-width="2.5"/><path d="M 45 45 L 48 57 L 55 45 Z" fill="white"/><path d="M 45 45 L 48 57 M 55 45" stroke="black" stroke-width="2.5"/></svg>');
+    background-size: 100% 100%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 10px 18px 22px 18px; /* Padding adjusted to keep text inside the shape */
+}
+
+.speech-bubble-item.type-cloud {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 25 18 C 15 18, 12 28, 18 36 C 12 44, 22 49, 30 47 C 38 54, 62 54, 70 47 C 78 49, 88 44, 82 36 C 88 28, 85 18, 75 18 C 65 10, 35 10, 25 18 Z" fill="white" stroke="black" stroke-width="2.5"/><circle cx="28" cy="50" r="3.5" fill="white" stroke="black" stroke-width="1.8"/><circle cx="24" cy="54" r="2" fill="white" stroke="black" stroke-width="1.8"/></svg>');
+    background-size: 100% 100%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 14px 18px 22px 18px;
+}
+
+.speech-bubble-item.type-rect {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><rect x="3" y="3" width="94" height="42" rx="6" ry="6" fill="white" stroke="black" stroke-width="2.5"/><path d="M 45 44 L 48 56 L 55 44 Z" fill="white"/><path d="M 45 44 L 48 56 M 55 44" stroke="black" stroke-width="2.5"/></svg>');
+    background-size: 100% 100%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 10px 14px 22px 14px;
+}
+
+.speech-bubble-item.type-shout {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 5 25 L 18 20 L 10 8 L 28 12 L 32 2 L 48 12 L 52 2 L 68 12 L 72 2 L 82 14 L 95 10 L 88 22 L 98 28 L 88 35 L 95 48 L 80 43 L 75 56 L 60 48 L 50 58 L 40 48 L 28 56 L 22 43 L 8 46 L 14 34 Z" fill="white" stroke="black" stroke-width="2.5"/></svg>');
+    background-size: 100% 100%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 12px 18px;
+}
+
+.speech-bubble-item.type-normal::after,
+.speech-bubble-item.type-normal::before,
+.speech-bubble-item.type-cloud::after,
+.speech-bubble-item.type-cloud::before,
+.speech-bubble-item.type-rect::after,
+.speech-bubble-item.type-rect::before,
+.speech-bubble-item.type-shout::after,
+.speech-bubble-item.type-shout::before {
+    display: none !important;
+}
+
 /* MODAL STYLING */
 .modal-overlay {
     position: fixed;
