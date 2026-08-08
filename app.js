@@ -1800,13 +1800,18 @@ document.getElementById("btn-build-bundle").addEventListener("click", () => {
         pages: state.pages
     };
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest, null, 2));
+    const jsonString = JSON.stringify(manifest, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
     const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("href", url);
     downloadAnchor.setAttribute("download", `KDP_Bundle_${state.title.replace(/ /g, "_")}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 100);
 
     alert("Pronto! Pacote de Manuscrito e Metadados do KDP exportado com sucesso como JSON.");
 });
@@ -2829,13 +2834,19 @@ function initProjectManager() {
             exportFileBtn.innerText = "Exportando...";
             
             createExportableStateBundle((bundle) => {
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bundle, null, 2));
+                const jsonString = JSON.stringify(bundle, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
                 const downloadAnchor = document.createElement("a");
-                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("href", url);
                 downloadAnchor.setAttribute("download", `Projeto_Manga_${projName.replace(/ /g, "_")}.json`);
                 document.body.appendChild(downloadAnchor);
                 downloadAnchor.click();
                 downloadAnchor.remove();
+                
+                // Release memory allocated for the blob URL
+                setTimeout(() => URL.revokeObjectURL(url), 100);
                 
                 exportFileBtn.disabled = false;
                 exportFileBtn.innerHTML = `
