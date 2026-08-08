@@ -934,6 +934,96 @@ function initInteriorPages() {
         });
     }
 
+    const autoLayoutBtn = document.getElementById("btn-auto-layout-bubbles");
+    if (autoLayoutBtn) {
+        autoLayoutBtn.addEventListener("click", () => {
+            const activePage = state.pages.find(p => p.id === state.activePageId);
+            if (!activePage) return;
+            
+            if (!activePage.panels || activePage.panels.length === 0) {
+                alert("Esta página não possui quadros para organizar.");
+                return;
+            }
+            
+            // Map panel indexes to clean default bubble coordinates (x%, y%) based on layout
+            const layout = activePage.layout;
+            let positions = [];
+            
+            if (layout === "1-panel" || layout === "full-image") {
+                positions = [{ x: 35, y: 15, w: 140, h: 90 }];
+            } else if (layout === "2-panel-h") {
+                positions = [
+                    { x: 35, y: 12, w: 130, h: 80 },
+                    { x: 35, y: 55, w: 130, h: 80 }
+                ];
+            } else if (layout === "3-panel") {
+                positions = [
+                    { x: 35, y: 8, w: 120, h: 70 },
+                    { x: 35, y: 40, w: 120, h: 70 },
+                    { x: 35, y: 72, w: 120, h: 70 }
+                ];
+            } else if (layout === "4-panel-grid") {
+                positions = [
+                    { x: 12, y: 12, w: 120, h: 70 },
+                    { x: 60, y: 12, w: 120, h: 70 },
+                    { x: 12, y: 55, w: 120, h: 70 },
+                    { x: 60, y: 55, w: 120, h: 70 }
+                ];
+            } else if (layout === "manga-style-a") {
+                positions = [
+                    { x: 12, y: 10, w: 110, h: 70 },
+                    { x: 60, y: 10, w: 110, h: 70 },
+                    { x: 35, y: 40, w: 120, h: 70 },
+                    { x: 12, y: 70, w: 110, h: 70 },
+                    { x: 60, y: 70, w: 110, h: 70 }
+                ];
+            } else if (layout === "manga-style-b") {
+                positions = [
+                    { x: 35, y: 10, w: 120, h: 70 },
+                    { x: 12, y: 40, w: 110, h: 70 },
+                    { x: 60, y: 40, w: 110, h: 70 },
+                    { x: 35, y: 75, w: 120, h: 70 }
+                ];
+            } else {
+                positions = Array.from({ length: activePage.panels.length }, (_, i) => ({
+                    x: 35,
+                    y: 15 + i * 20,
+                    w: 120,
+                    h: 70
+                }));
+            }
+            
+            const newBubbles = [];
+            activePage.panels.forEach((panel, index) => {
+                const dialogText = (panel.dialog || "").trim();
+                if (dialogText) {
+                    const pos = positions[index] || { x: 35, y: 35, w: 120, h: 70 };
+                    newBubbles.push({
+                        id: `b-${Date.now()}-${index}`,
+                        text: dialogText,
+                        x: pos.x,
+                        y: pos.y,
+                        type: "normal",
+                        width: pos.w,
+                        height: pos.h,
+                        rotation: 0
+                    });
+                }
+            });
+            
+            if (newBubbles.length === 0) {
+                alert("Nenhum diálogo encontrado nos campos de texto dos quadros. Digite os diálogos primeiro nas caixas dos quadros à esquerda!");
+                return;
+            }
+            
+            activePage.bubbles = newBubbles;
+            saveStateToStorage();
+            renderPageCanvas();
+            renderSpeechBubblesOverlay(activePage);
+            showToast("Balões gerados e posicionados automaticamente!", "success");
+        });
+    }
+
     if (generateArtBtn) {
         generateArtBtn.addEventListener("click", () => {
             generatePageSketchesIA();
