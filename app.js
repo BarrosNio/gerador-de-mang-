@@ -287,10 +287,10 @@ function loadStateFromStorage() {
                 };
             }
 
-            // Inicializa a chave de chat se vazia usando Base64 para passar no escaneamento do GitHub
+            // Inicializa a chave de chat se vazia
             if (!state.api || !state.api.chatKey) {
                 if (!state.api) state.api = {};
-                state.api.chatKey = atob("c2stcHJvai0xSzVsV1dHODduaWd2NEUzS2t2T3gxaDhWcnZTTy05YmxFd00ya0ZmOGd3OUhONU90dkpjdVA4djBPWDItQWo0VnYxNmQtdHlueVQzQmxia0ZKLU1Xbk9kN2tFM1BHSDJZZUdtUU9WWEh1OEtRaUVFTmkySUlJNlVDUU03SDRsajFMYnJtZFBXelFzUUlfcm04V09tZ3A0enl1RUE=");
+                state.api.chatKey = "";
                 saveStateToStorage();
             }
 
