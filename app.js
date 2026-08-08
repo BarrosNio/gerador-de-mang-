@@ -2443,10 +2443,8 @@ let pageAttachmentBase64 = null;
 function callChatAPI(userMessage, imageBase64, callback) {
     console.log("Chamando OpenAI GPT para orientar criação do mangá...");
     
-    // Recupera a chave salva localmente ou usa a chave de teste padrão decodificada de Base64 (evita o bloqueio do GitHub)
-    const apiKey = (state.api && state.api.chatKey) 
-        ? state.api.chatKey 
-        : atob("c2stcHJvai0xSzVsV1dHODduaWd2NEUzS2t2T3gxaDhWcnZTTy05YmxFd00ya0ZmOGd3OUhONU90dkpjdVA4djBPWDItQWo0VnYxNmQtdHlueVQzQmxia0ZKLU1Xbk9kN2tFM1BHSDJZZUdtUU9WWEh1OEtRaUVFTmkySUlJNlVDUU03SDRsajFMYnJtZFBXelFzUUlfcm04V09tZ3A0enl1RUE=");
+    // Recupera a chave salva localmente
+    const apiKey = (state.api && state.api.chatKey) ? state.api.chatKey : "";
 
     const systemPrompt = `Você é um Orientador e Organizador de Criação de Mangás profissional. Seu trabalho é ajudar o autor a estruturar sua história, organizar ideias e principalmente: preparar prompts otimizados em inglês para o gerador de imagem ComfyUI rodando o modelo "Illustrious XL".
 O modelo Illustrious XL se destaca quando usamos tags no estilo Danbooru separadas por vírgula combinadas com termos de alta qualidade.
